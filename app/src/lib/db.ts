@@ -19,6 +19,7 @@ let dbInstance: Database | null = null;
 export async function getDb(): Promise<Database> {
   if (!dbInstance) {
     dbInstance = await Database.load(DB_NAME);
+    await dbInstance.execute("PRAGMA foreign_keys = ON");
   }
   return dbInstance;
 }
@@ -288,7 +289,7 @@ export async function updateSession(id: string, input: UpdateSessionInput): Prom
   const values: unknown[] = [];
   let idx = 1;
 
-  const jsonFields = ["transcript", "notes", "context"];
+  const jsonFields = ["transcript", "notes"];
 
   for (const [key, value] of Object.entries(input)) {
     if (value !== undefined) {
@@ -326,6 +327,6 @@ function parseSessionJson(s: Session): Session {
     ...s,
     transcript: typeof s.transcript === "string" ? JSON.parse(s.transcript as unknown as string) : s.transcript,
     notes: typeof s.notes === "string" ? JSON.parse(s.notes as unknown as string) : s.notes,
-    context: typeof s.context === "string" ? JSON.parse(s.context as unknown as string) : s.context,
+    context: s.context ?? null,
   };
 }
