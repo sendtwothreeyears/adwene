@@ -1,0 +1,38 @@
+# Claude Code
+CLAUDE.md
+.claude/
+notes/
+
+# Project-specific
+docs/
+server/
+guidelines/
+api_key.txt
+training_data.jsonl
+fine-tuning/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Rust
+target/
+
+# Node
+node_modules/
+dist/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# OS
+.DS_Store
+
+# Runtime & logs
+*.db
+*.log
