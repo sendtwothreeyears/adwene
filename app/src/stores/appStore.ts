@@ -23,6 +23,8 @@ interface AppState {
   // Active session
   activeSession: Session | null;
   setActiveSession: (session: Session | null) => void;
+  /** Merge partial fields into activeSession using current store state (avoids stale closures). */
+  mergeActiveSession: (fields: Partial<Session>) => void;
 
   // Modal visibility
   showPatientForm: boolean;
@@ -46,6 +48,12 @@ export const useAppStore = create<AppState>((set) => ({
 
   activeSession: null,
   setActiveSession: (session) => set({ activeSession: session }),
+  mergeActiveSession: (fields) =>
+    set((state) => ({
+      activeSession: state.activeSession
+        ? { ...state.activeSession, ...fields }
+        : null,
+    })),
 
   showPatientForm: false,
   openPatientForm: () => set({ showPatientForm: true }),

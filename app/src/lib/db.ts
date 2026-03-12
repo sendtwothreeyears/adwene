@@ -246,12 +246,13 @@ export async function createSession(input: CreateSessionInput): Promise<Session>
 
   await db.execute(
     `INSERT INTO Session (
-      id, transcript, notes, summary, context, status, preview,
+      id, transcript, rawTranscript, notes, summary, context, status, preview,
       providerId, patientId, templateId, createdAt, updatedAt
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
     [
       id,
       input.transcript ? JSON.stringify(input.transcript) : null,
+      input.rawTranscript ?? null,
       input.notes ? JSON.stringify(input.notes) : null,
       input.summary,
       input.context ? JSON.stringify(input.context) : null,
@@ -289,7 +290,7 @@ export async function updateSession(id: string, input: UpdateSessionInput): Prom
   const values: unknown[] = [];
   let idx = 1;
 
-  const jsonFields = ["transcript", "notes"];
+  const jsonFields = ["transcript", "notes", "context"];
 
   for (const [key, value] of Object.entries(input)) {
     if (value !== undefined) {
@@ -322,11 +323,19 @@ export async function deleteSession(id: string): Promise<void> {
 
 // --- Helpers ---
 
+function tryParseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 function parseSessionJson(s: Session): Session {
   return {
     ...s,
     transcript: typeof s.transcript === "string" ? JSON.parse(s.transcript as unknown as string) : s.transcript,
     notes: typeof s.notes === "string" ? JSON.parse(s.notes as unknown as string) : s.notes,
-    context: s.context ?? null,
+    context: typeof s.context === "string" ? tryParseJson(s.context) : s.context ?? null,
   };
 }

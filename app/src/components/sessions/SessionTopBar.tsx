@@ -1,16 +1,30 @@
-import { Trash2, Mic } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import type { Patient, Session } from "../../types";
 import StatusBadge from "../ui/StatusBadge";
+import RecordButton from "./RecordButton";
+import AudioLevel from "./AudioLevel";
 
 interface SessionTopBarProps {
   session: Session;
   patient: Patient | null;
+  isRecording: boolean;
+  isTranscribing?: boolean;
+  sidecarConnected: boolean;
+  audioLevel: number;
+  onStart: () => Promise<void>;
+  onStop: () => Promise<void>;
   onDelete: () => void;
 }
 
 export default function SessionTopBar({
   session,
   patient,
+  isRecording,
+  isTranscribing,
+  sidecarConnected,
+  audioLevel,
+  onStart,
+  onStop,
   onDelete,
 }: SessionTopBarProps) {
   return (
@@ -25,14 +39,19 @@ export default function SessionTopBar({
       </div>
 
       <div className="flex items-center gap-2">
-        <button
-          disabled
-          className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-400"
-          title="Coming in Step 4"
-        >
-          <Mic className="h-4 w-4" />
-          Create Transcription
-        </button>
+        {!sidecarConnected && !isRecording && (
+          <span className="text-xs text-red-500">Sidecar offline</span>
+        )}
+        {isTranscribing && (
+          <span className="text-xs text-amber-600 animate-pulse">Transcribing...</span>
+        )}
+        <AudioLevel level={audioLevel} visible={isRecording} />
+        <RecordButton
+          isRecording={isRecording}
+          disabled={isTranscribing || (!isRecording && !sidecarConnected)}
+          onStart={onStart}
+          onStop={onStop}
+        />
         <button
           onClick={onDelete}
           className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"

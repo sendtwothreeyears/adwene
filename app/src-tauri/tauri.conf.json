@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "identifier": "com.kasamd.adwene-offline",
   "build": {
-    "beforeDevCommand": "pnpm dev",
+    "beforeDevCommand": "lsof -ti :8765 | xargs kill -9 2>/dev/null; pnpm dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
@@ -20,7 +20,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-eval'; connect-src 'self' ws://localhost:8765; media-src 'self' blob:; style-src 'self' 'unsafe-inline'"
     }
   },
   "bundle": {
