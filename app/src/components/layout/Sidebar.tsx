@@ -6,6 +6,8 @@ import {
   Plus,
 } from "lucide-react";
 import { useAppStore, type AppView } from "../../stores/appStore";
+import * as db from "../../lib/db";
+import { useSidecar } from "../../hooks/useSidecar";
 
 interface NavItem {
   view: AppView;
@@ -29,7 +31,27 @@ export default function Sidebar({ providerName, providerEmail }: SidebarProps) {
   const currentView = useAppStore((s) => s.currentView);
   const setView = useAppStore((s) => s.setView);
   const activeSession = useAppStore((s) => s.activeSession);
-  const openSessionForm = useAppStore((s) => s.openSessionForm);
+  const setActiveSession = useAppStore((s) => s.setActiveSession);
+  const providerId = useAppStore((s) => s.providerId);
+  const { connectionState } = useSidecar();
+
+  async function handleCreateSession() {
+    if (!providerId) return;
+    const session = await db.createSession({
+      status: "DRAFT",
+      providerId,
+      patientId: null,
+      templateId: null,
+      transcript: null,
+      rawTranscript: null,
+      notes: null,
+      summary: null,
+      context: null,
+      preview: null,
+    });
+    setActiveSession(session);
+    setView("current-session");
+  }
 
   const initials = providerName
     .split(" ")
@@ -48,7 +70,7 @@ export default function Sidebar({ providerName, providerEmail }: SidebarProps) {
       {/* Create Session button */}
       <div className="px-3 pb-4">
         <button
-          onClick={openSessionForm}
+          onClick={handleCreateSession}
           className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark"
         >
           <Plus className="h-4 w-4" />
@@ -81,6 +103,26 @@ export default function Sidebar({ providerName, providerEmail }: SidebarProps) {
           );
         })}
       </nav>
+
+      {/* Sidecar status */}
+      <div className="px-4 py-2">
+        <div className="flex items-center gap-2 text-xs text-sidebar-text-muted">
+          <span
+            className={`h-2 w-2 rounded-full ${
+              connectionState === "connected"
+                ? "bg-green-500"
+                : connectionState === "connecting"
+                  ? "bg-yellow-500"
+                  : "bg-red-400"
+            }`}
+          />
+          {connectionState === "connected"
+            ? "Sidecar connected"
+            : connectionState === "connecting"
+              ? "Connecting..."
+              : "Sidecar offline"}
+        </div>
+      </div>
 
       {/* Provider info */}
       <div className="border-t border-sidebar-border px-4 py-3">

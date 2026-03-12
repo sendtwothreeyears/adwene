@@ -57,6 +57,7 @@ export default function CreateSessionModal() {
         patientId: selectedPatientId,
         templateId: selectedTemplateId,
         transcript: null,
+        rawTranscript: null,
         notes: null,
         summary: null,
         context: null,

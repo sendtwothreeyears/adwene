@@ -122,6 +122,7 @@ export interface Template {
 export interface Session {
   id: string;
   transcript: unknown | null;
+  rawTranscript: string | null;
   notes: unknown | null;
   summary: string | null;
   context: unknown | null;
