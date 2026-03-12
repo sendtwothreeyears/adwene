@@ -18,6 +18,7 @@ export default function RecentSessionsView() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!providerId) return;
@@ -86,7 +87,6 @@ export default function RecentSessionsView() {
   }
 
   async function handleDelete(session: Session) {
-    if (!confirm("Delete this session?")) return;
     try {
       await db.deleteSession(session.id);
       // Reload inline (no stale concern — user-triggered)
@@ -153,7 +153,16 @@ export default function RecentSessionsView() {
               session={session}
               patientName={getPatientName(session)}
               onClick={handleOpen}
-              onDelete={handleDelete}
+              confirmingDelete={deletingId === session.id}
+              onDelete={(s) => {
+                if (deletingId === s.id) {
+                  setDeletingId(null);
+                  handleDelete(s);
+                } else {
+                  setDeletingId(s.id);
+                }
+              }}
+              onDeleteCancel={() => setDeletingId(null)}
             />
           ))}
         </div>

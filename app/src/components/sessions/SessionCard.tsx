@@ -7,6 +7,8 @@ interface SessionCardProps {
   patientName: string | null;
   onClick: (session: Session) => void;
   onDelete: (session: Session) => void;
+  confirmingDelete?: boolean;
+  onDeleteCancel?: () => void;
 }
 
 export default function SessionCard({
@@ -14,6 +16,8 @@ export default function SessionCard({
   patientName,
   onClick,
   onDelete,
+  confirmingDelete,
+  onDeleteCancel,
 }: SessionCardProps) {
   const created = new Date(session.createdAt).toLocaleDateString(undefined, {
     month: "short",
@@ -25,8 +29,12 @@ export default function SessionCard({
 
   return (
     <div
-      onClick={() => onClick(session)}
-      className="flex cursor-pointer items-center justify-between rounded-md border border-gray-200 px-4 py-3 transition-colors hover:border-gray-300 hover:bg-gray-50"
+      onClick={() => !confirmingDelete && onClick(session)}
+      className={`flex items-center justify-between rounded-md border px-4 py-3 transition-colors ${
+        confirmingDelete
+          ? "border-red-200 bg-red-50"
+          : "cursor-pointer border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+      }`}
     >
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -43,17 +51,41 @@ export default function SessionCard({
         </p>
       </div>
 
-      <div className="ml-3 shrink-0">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(session);
-          }}
-          className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
-          title="Delete session"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+      <div className="ml-3 flex shrink-0 items-center gap-2">
+        {confirmingDelete ? (
+          <>
+            <span className="text-sm text-gray-500">Delete?</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(session);
+              }}
+              className="rounded-md bg-red-600 px-2.5 py-1 text-sm font-medium text-white hover:bg-red-700"
+            >
+              Yes
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteCancel?.();
+              }}
+              className="rounded-md px-2.5 py-1 text-sm font-medium text-gray-600 hover:bg-gray-100"
+            >
+              No
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(session);
+            }}
+            className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
+            title="Delete session"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );

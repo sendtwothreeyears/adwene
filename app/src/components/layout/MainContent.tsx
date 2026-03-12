@@ -8,7 +8,7 @@ export default function MainContent() {
   const currentView = useAppStore((s) => s.currentView);
 
   return (
-    <main className="flex-1 overflow-auto bg-white p-6">
+    <main className="flex min-h-0 flex-1 flex-col overflow-hidden bg-white p-6">
       {currentView === "records" && <RecordsView />}
       {currentView === "current-session" && <SessionView />}
       {currentView === "templates" && <TemplatesView />}

@@ -14,9 +14,10 @@ import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext
 import { ListNode, ListItemNode } from "@lexical/list";
 import { LinkNode } from "@lexical/link";
 import { CodeNode } from "@lexical/code";
+import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { EditorState, SerializedEditorState } from "lexical";
 
-const EDITOR_NODES = [ListNode, ListItemNode, LinkNode, CodeNode];
+const EDITOR_NODES = [ListNode, ListItemNode, LinkNode, CodeNode, HeadingNode, QuoteNode];
 
 /** Loads an existing Lexical editor state into the editor on mount. */
 function LoadStatePlugin({
@@ -67,7 +68,7 @@ export default memo(function SessionEditor({
     }
   }
 
-  const editorClassName = "min-h-[200px] px-4 py-3 text-sm text-gray-900 outline-none";
+  const editorClassName = "min-h-0 flex-1 overflow-auto px-4 py-3 text-sm text-gray-900 outline-none";
   const placeholderEl = (
     <div className="pointer-events-none absolute top-0 left-0 px-4 py-3 text-sm text-gray-400">
       {placeholder}
@@ -77,7 +78,7 @@ export default memo(function SessionEditor({
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <div
-        className={`relative rounded-md border ${
+        className={`relative flex h-full flex-col rounded-md border ${
           readOnly
             ? "border-gray-200 bg-gray-50"
             : "border-gray-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"

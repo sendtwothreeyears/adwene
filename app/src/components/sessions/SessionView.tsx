@@ -11,6 +11,7 @@ import { useAudioCapture } from "../../hooks/useAudioCapture";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useNoteGeneration } from "../../hooks/useNoteGeneration";
 import { useSidecar } from "../../contexts/SidecarContext";
+import { markdownToLexical } from "../../lib/markdown-to-lexical";
 
 /** Maps each tab to the Session field it reads/writes. */
 const TAB_FIELD: Record<SessionTab, "context" | "transcript" | "notes"> = {
@@ -26,6 +27,7 @@ const TAB_PLACEHOLDER: Record<SessionTab, string> = {
 };
 
 const SAVE_DEBOUNCE_MS = 800;
+const STREAM_DEBOUNCE_MS = 200;
 
 export default function SessionView() {
   const activeSession = useAppStore((s) => s.activeSession);
@@ -36,6 +38,9 @@ export default function SessionView() {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<SessionTab>("context");
   const [error, setError] = useState<string | null>(null);
+  const [streamPreview, setStreamPreview] = useState<SerializedEditorState | null>(null);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const {
     transcript: _transcript,
@@ -56,6 +61,8 @@ export default function SessionView() {
 
   const {
     isGenerating,
+    isStreaming,
+    streamingText,
     error: noteError,
     generateNote,
     onNoteGenerated,
@@ -66,6 +73,17 @@ export default function SessionView() {
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<{ sessionId: string; field: string; state: SerializedEditorState } | null>(null);
+  const streamingTextRef = useRef(streamingText);
+  streamingTextRef.current = streamingText;
+
+  // Reset tab and local state when switching sessions
+  useEffect(() => {
+    setActiveTab("context");
+    setError(null);
+    setStreamPreview(null);
+    setConfirmRegenerate(false);
+    setConfirmDelete(false);
+  }, [activeSession?.id]);
 
   useEffect(() => {
     if (!activeSession?.patientId) {
@@ -75,13 +93,43 @@ export default function SessionView() {
     db.getPatient(activeSession.patientId).then(setPatient).catch(() => setPatient(null));
   }, [activeSession?.patientId]);
 
+  // Throttled streaming preview: convert markdown → Lexical at a fixed interval
+  // while streaming. Uses a ref so the interval always reads the latest text
+  // without re-running the effect on every chunk (which killed the old debounce).
+  useEffect(() => {
+    if (!isStreaming) {
+      setStreamPreview(null);
+      return;
+    }
+
+    const tick = () => {
+      const text = streamingTextRef.current;
+      if (text) {
+        try {
+          setStreamPreview(markdownToLexical(text));
+        } catch {
+          // Partial markdown may fail to parse — ignore until next tick
+        }
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, STREAM_DEBOUNCE_MS);
+    return () => clearInterval(id);
+  }, [isStreaming]);
+
   // Save generated note to DB and update store
   useEffect(() => {
     onNoteGenerated(async (content) => {
       if (!activeSession) return;
       try {
-        await db.updateSession(activeSession.id, { notes: content });
-        mergeActiveSession({ notes: content as SerializedEditorState });
+        // Sidecar sends markdown (string); legacy data is Lexical JSON (object)
+        const lexicalState =
+          typeof content === "string"
+            ? markdownToLexical(content)
+            : (content as SerializedEditorState);
+        await db.updateSession(activeSession.id, { notes: lexicalState });
+        mergeActiveSession(activeSession.id, { notes: lexicalState });
       } catch (err) {
         console.error("Failed to save generated note:", err);
       }
@@ -115,7 +163,7 @@ export default function SessionView() {
     if (text && activeSession) {
       try {
         await db.updateSession(activeSession.id, { rawTranscript: text });
-        mergeActiveSession({ rawTranscript: text });
+        mergeActiveSession(activeSession.id, { rawTranscript: text });
       } catch (err) {
         console.error("Failed to save rawTranscript:", err);
       }
@@ -134,7 +182,7 @@ export default function SessionView() {
         pendingSaveRef.current = null;
         try {
           await db.updateSession(activeSession.id, { [field]: state });
-          mergeActiveSession({ [field]: state });
+          mergeActiveSession(activeSession.id, { [field]: state });
         } catch (err) {
           console.error(`Failed to save ${field}:`, err);
         }
@@ -153,7 +201,6 @@ export default function SessionView() {
 
   async function handleDelete() {
     if (!activeSession) return;
-    if (!confirm("Delete this session?")) return;
     try {
       await db.deleteSession(activeSession.id);
       setActiveSession(null);
@@ -164,11 +211,15 @@ export default function SessionView() {
   }
 
   const field = TAB_FIELD[activeTab];
-  const initialState = (activeSession[field] as SerializedEditorState | null) ?? null;
-  const isReadOnly = activeTab === "transcription";
+  // While streaming on the note tab, show the live preview; otherwise show persisted state
+  const noteIsStreaming = activeTab === "note" && isStreaming && streamPreview;
+  const initialState = noteIsStreaming
+    ? streamPreview
+    : ((activeSession[field] as SerializedEditorState | null) ?? null);
+  const isReadOnly = activeTab === "transcription" || (activeTab === "note" && isStreaming);
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="flex h-full flex-col">
       {error && (
         <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
           {error}
@@ -202,7 +253,10 @@ export default function SessionView() {
         audioLevel={audioLevel}
         onStart={handleStartRecording}
         onStop={handleStopRecording}
-        onDelete={handleDelete}
+        confirmDelete={confirmDelete}
+        onDeleteRequest={() => setConfirmDelete(true)}
+        onDeleteConfirm={() => { setConfirmDelete(false); handleDelete(); }}
+        onDeleteCancel={() => setConfirmDelete(false)}
       />
 
       <SessionTabBar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -220,31 +274,58 @@ export default function SessionView() {
       )}
 
       {activeTab === "note" && (
-        <div className="flex justify-end pt-4">
-          <button
-            type="button"
-            disabled={!activeSession.rawTranscript || isGenerating}
-            onClick={() => {
-              if (activeSession.notes && !confirm("This will replace the existing note. Continue?")) return;
-              generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
-            }}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {isGenerating ? (
-              <span className="flex items-center gap-1.5">
-                <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-white/60" />
-                Generating...
-              </span>
-            ) : activeSession.notes ? (
-              "Regenerate Note"
-            ) : (
-              "Generate Note"
-            )}
-          </button>
+        <div className="flex items-center justify-end gap-2 pt-4">
+          {confirmRegenerate && (
+            <>
+              <span className="text-sm text-gray-500">Replace existing note?</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmRegenerate(false);
+                  generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
+                }}
+                className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+              >
+                Yes, replace
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmRegenerate(false)}
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+            </>
+          )}
+          {!confirmRegenerate && (
+            <button
+              type="button"
+              disabled={!activeSession.rawTranscript || isGenerating}
+              onClick={() => {
+                if (activeSession.notes) {
+                  setConfirmRegenerate(true);
+                } else {
+                  generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
+                }
+              }}
+              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {isGenerating ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-white/60" />
+                  Generating...
+                </span>
+              ) : activeSession.notes ? (
+                "Regenerate Note"
+              ) : (
+                "Generate Note"
+              )}
+            </button>
+          )}
         </div>
       )}
 
-      <div className="pt-2">
+      <div className="min-h-0 flex-1 pt-2">
         {activeTab === "transcription" ? (
           <TranscriptPanel
             rawTranscript={activeSession.rawTranscript}
@@ -252,7 +333,7 @@ export default function SessionView() {
           />
         ) : (
           <SessionEditor
-            key={activeTab}
+            key={noteIsStreaming ? `note-streaming` : `${activeSession.id}-${activeTab}`}
             initialState={initialState}
             onChange={isReadOnly ? undefined : handleEditorChange}
             readOnly={isReadOnly}
