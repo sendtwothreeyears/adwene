@@ -45,6 +45,8 @@ interface SessionEditorProps {
   readOnly?: boolean;
   /** Placeholder text shown when the editor is empty. */
   placeholder?: string;
+  /** Optional header rendered inside the editor card, above the content area. */
+  header?: React.ReactNode;
 }
 
 export default memo(function SessionEditor({
@@ -52,6 +54,7 @@ export default memo(function SessionEditor({
   onChange,
   readOnly = false,
   placeholder,
+  header,
 }: SessionEditorProps) {
   const initialConfig = {
     namespace: "SessionEditor",
@@ -78,26 +81,29 @@ export default memo(function SessionEditor({
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <div
-        className={`relative flex h-full flex-col rounded-md border border-border bg-white ${
+        className={`flex h-full flex-col rounded-md border border-border bg-white ${
           readOnly
             ? ""
             : "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring"
         }`}
       >
-        <RichTextPlugin
-          contentEditable={
-            placeholder ? (
-              <ContentEditable
-                className={editorClassName}
-                aria-placeholder={placeholder}
-                placeholder={placeholderEl}
-              />
-            ) : (
-              <ContentEditable className={editorClassName} />
-            )
-          }
-          ErrorBoundary={LexicalErrorBoundary}
-        />
+        {header}
+        <div className="relative min-h-0 flex-1 flex flex-col">
+          <RichTextPlugin
+            contentEditable={
+              placeholder ? (
+                <ContentEditable
+                  className={editorClassName}
+                  aria-placeholder={placeholder}
+                  placeholder={placeholderEl}
+                />
+              ) : (
+                <ContentEditable className={editorClassName} />
+              )
+            }
+            ErrorBoundary={LexicalErrorBoundary}
+          />
+        </div>
         <HistoryPlugin />
         {onChange && <OnChangePlugin onChange={handleChange} />}
         <LoadStatePlugin editorState={initialState} />

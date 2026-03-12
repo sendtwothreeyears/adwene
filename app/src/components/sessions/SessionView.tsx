@@ -7,11 +7,34 @@ import SessionTopBar from "./SessionTopBar";
 import SessionTabBar, { type SessionTab } from "./SessionTabBar";
 import SessionEditor from "./SessionEditor";
 import TranscriptPanel from "./TranscriptPanel";
+import NoteToolbar from "./NoteToolbar";
 import { useAudioCapture } from "../../hooks/useAudioCapture";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useNoteGeneration } from "../../hooks/useNoteGeneration";
 import { useSidecar } from "../../contexts/SidecarContext";
 import { markdownToLexical } from "../../lib/markdown-to-lexical";
+
+/** Extract plain text from a serialized Lexical editor state. */
+function extractTextFromLexical(state: SerializedEditorState): string {
+  const lines: string[] = [];
+  function walk(node: Record<string, unknown>) {
+    if (node.type === "text" && typeof node.text === "string") {
+      lines.push(node.text);
+    }
+    if (node.type === "linebreak") {
+      lines.push("\n");
+    }
+    if (node.type === "paragraph" || node.type === "heading") {
+      if (lines.length > 0 && lines[lines.length - 1] !== "\n") lines.push("\n");
+    }
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) walk(child as Record<string, unknown>);
+      if (node.type === "paragraph" || node.type === "heading") lines.push("\n");
+    }
+  }
+  walk(state.root as unknown as Record<string, unknown>);
+  return lines.join("").trim();
+}
 
 /** Maps each tab to the Session field it reads/writes. */
 const TAB_FIELD: Record<SessionTab, "context" | "transcript" | "notes"> = {
@@ -273,58 +296,6 @@ export default function SessionView() {
         </div>
       )}
 
-      {activeTab === "note" && (
-        <div className="flex items-center justify-end gap-2 pt-4">
-          {confirmRegenerate && (
-            <>
-              <span className="text-sm text-gray-500">Replace existing note?</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmRegenerate(false);
-                  generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
-                }}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
-              >
-                Yes, replace
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirmRegenerate(false)}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-            </>
-          )}
-          {!confirmRegenerate && (
-            <button
-              type="button"
-              disabled={!activeSession.rawTranscript || isGenerating}
-              onClick={() => {
-                if (activeSession.notes) {
-                  setConfirmRegenerate(true);
-                } else {
-                  generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
-                }
-              }}
-              className="rounded-lg bg-button px-3 py-1.5 text-sm font-medium text-white hover:bg-button-hover transition-colors disabled:opacity-50"
-            >
-              {isGenerating ? (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-white/60" />
-                  Generating...
-                </span>
-              ) : activeSession.notes ? (
-                "Regenerate Note"
-              ) : (
-                "Generate Note"
-              )}
-            </button>
-          )}
-        </div>
-      )}
-
       <div className="min-h-0 flex-1 pt-2">
         {activeTab === "transcription" ? (
           <TranscriptPanel
@@ -338,6 +309,57 @@ export default function SessionView() {
             onChange={isReadOnly ? undefined : handleEditorChange}
             readOnly={isReadOnly}
             placeholder={TAB_PLACEHOLDER[activeTab]}
+            header={
+              activeTab === "note"
+                ? confirmRegenerate
+                  ? (
+                    <div className="flex items-center justify-end gap-2 px-4 pt-3">
+                      <span className="text-sm text-gray-500">Replace existing note?</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmRegenerate(false);
+                          generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
+                        }}
+                        className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                      >
+                        Yes, replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRegenerate(false)}
+                        className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )
+                  : (
+                    <NoteToolbar
+                      hasNote={!!activeSession.notes}
+                      isGenerating={isGenerating}
+                      canGenerate={!!activeSession.rawTranscript}
+                      onCopy={() => {
+                        const notes = activeSession.notes as SerializedEditorState | null;
+                        if (!notes) return;
+                        try {
+                          const text = extractTextFromLexical(notes);
+                          navigator.clipboard.writeText(text);
+                        } catch (err) {
+                          console.error("Failed to copy note:", err);
+                        }
+                      }}
+                      onRegenerate={() => {
+                        if (activeSession.notes) {
+                          setConfirmRegenerate(true);
+                        } else {
+                          generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
+                        }
+                      }}
+                    />
+                  )
+                : undefined
+            }
           />
         )}
       </div>
