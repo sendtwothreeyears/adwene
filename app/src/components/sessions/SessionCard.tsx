@@ -30,10 +30,10 @@ export default function SessionCard({
   return (
     <div
       onClick={() => !confirmingDelete && onClick(session)}
-      className={`flex items-center justify-between rounded-md border px-4 py-3 transition-colors ${
+      className={`flex items-center justify-between rounded-lg border px-4 py-3 transition-shadow ${
         confirmingDelete
           ? "border-red-200 bg-red-50"
-          : "cursor-pointer border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+          : "cursor-pointer border-gray-200 hover:shadow-md"
       }`}
     >
       <div className="min-w-0 flex-1">

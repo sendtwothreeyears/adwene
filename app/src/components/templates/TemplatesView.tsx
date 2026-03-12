@@ -104,10 +104,10 @@ export default function TemplatesView() {
     <div className="mx-auto max-w-5xl">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">Templates</h1>
+        <h1 className="text-2xl font-bold text-gray-900 font-gtsuper">Templates</h1>
         <button
           onClick={handleOpenCreate}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-button px-4 py-2 text-sm font-medium text-white hover:bg-button-hover transition-colors"
         >
           <Plus className="h-4 w-4" />
           Create Template
@@ -135,7 +135,7 @@ export default function TemplatesView() {
             <div
               key={template.id}
               onClick={() => setViewingTemplate(template)}
-              className="relative flex cursor-pointer flex-col justify-between rounded-lg border border-gray-200 p-4 transition-colors hover:border-gray-300 hover:shadow-sm"
+              className="relative flex cursor-pointer flex-col justify-between rounded-lg border border-gray-200 p-4 transition-shadow hover:shadow-md"
             >
               {/* Three-dot menu */}
               {!template.isSystem && (
@@ -204,11 +204,11 @@ export default function TemplatesView() {
       {/* View template modal */}
       {viewingTemplate && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
           onClick={() => setViewingTemplate(null)}
         >
           <div
-            className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl"
+            className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-2xl font-fakt"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
@@ -282,7 +282,7 @@ export default function TemplatesView() {
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
               placeholder="e.g. Follow-Up Visit"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
@@ -295,7 +295,7 @@ export default function TemplatesView() {
               value={createDescription}
               onChange={(e) => setCreateDescription(e.target.value)}
               placeholder="Brief description of this template"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
@@ -319,7 +319,7 @@ export default function TemplatesView() {
             <button
               onClick={handleCreate}
               disabled={!createName.trim() || !createContent || creating}
-              className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+              className="rounded-lg bg-button px-4 py-1.5 text-sm font-medium text-white hover:bg-button-hover transition-colors disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create Template"}
             </button>

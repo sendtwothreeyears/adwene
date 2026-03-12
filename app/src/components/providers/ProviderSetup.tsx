@@ -51,7 +51,7 @@ export default function ProviderSetup({ onSubmit }: ProviderSetupProps) {
               required
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
@@ -64,7 +64,7 @@ export default function ProviderSetup({ onSubmit }: ProviderSetupProps) {
               required
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
@@ -77,7 +77,7 @@ export default function ProviderSetup({ onSubmit }: ProviderSetupProps) {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
 
@@ -88,7 +88,7 @@ export default function ProviderSetup({ onSubmit }: ProviderSetupProps) {
             <select
               value={providerType}
               onChange={(e) => setProviderType(e.target.value as ProviderType)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
             >
               <option value="MD">MD</option>
               <option value="DO">DO</option>
@@ -104,7 +104,7 @@ export default function ProviderSetup({ onSubmit }: ProviderSetupProps) {
           <button
             type="submit"
             disabled={!isValid || submitting}
-            className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg bg-button px-4 py-2 text-sm font-medium text-white hover:bg-button-hover transition-colors disabled:cursor-not-allowed disabled:opacity-50"
           >
             {submitting ? "Creating..." : "Get Started"}
           </button>

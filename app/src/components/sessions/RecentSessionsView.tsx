@@ -109,7 +109,7 @@ export default function RecentSessionsView() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-4">
-        <h1 className="text-lg font-semibold text-gray-900">Recent Sessions</h1>
+        <h1 className="text-lg font-semibold text-gray-900 font-gtsuper">Recent Sessions</h1>
       </div>
 
       {error && (
@@ -129,7 +129,7 @@ export default function RecentSessionsView() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-          className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
         >
           <option value="ALL">All</option>
           <option value="DRAFT">Draft</option>

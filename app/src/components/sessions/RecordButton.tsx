@@ -34,12 +34,12 @@ export default function RecordButton({
     <button
       onClick={handleClick}
       disabled={isDisabled}
-      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
         isDisabled
           ? "cursor-not-allowed bg-gray-100 text-gray-400"
           : isRecording
             ? "bg-red-600 text-white hover:bg-red-700"
-            : "bg-indigo-600 text-white hover:bg-indigo-700"
+            : "bg-button text-white hover:bg-button-hover"
       }`}
     >
       {isRecording ? (

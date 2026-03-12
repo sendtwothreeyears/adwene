@@ -5,31 +5,45 @@ interface SessionTabBarProps {
   onTabChange: (tab: SessionTab) => void;
 }
 
-const tabs: { id: SessionTab; label: string }[] = [
-  { id: "context", label: "Context" },
-  { id: "transcription", label: "Transcription" },
-  { id: "note", label: "Note" },
+const tabs: { id: SessionTab; label: string; icon: string }[] = [
+  { id: "context", label: "Context", icon: "/icons/context.svg" },
+  { id: "transcription", label: "Transcription", icon: "/icons/transcription.svg" },
+  { id: "note", label: "Note", icon: "/icons/note.svg" },
 ];
+
+function Separator() {
+  return <div className="mx-2 my-auto h-6 w-px shrink-0 bg-border" />;
+}
 
 export default function SessionTabBar({
   activeTab,
   onTabChange,
 }: SessionTabBarProps) {
   return (
-    <div className="flex gap-1 border-b border-gray-200">
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onTabChange(tab.id)}
-          className={`px-4 py-2 text-sm font-medium transition-colors ${
-            activeTab === tab.id
-              ? "border-b-2 border-primary text-primary"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
+    <div className="flex items-center py-2">
+      {tabs.map((tab, i) => {
+        const isActive = activeTab === tab.id;
+        return (
+          <div key={tab.id} className="flex items-center">
+            {i > 0 && <Separator />}
+            <button
+              onClick={() => onTabChange(tab.id)}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                isActive
+                  ? "border-border bg-white text-gray-900"
+                  : "border-transparent text-gray-500 hover:border-border"
+              }`}
+            >
+              <img
+                src={tab.icon}
+                alt=""
+                className={`h-5 w-5 ${isActive ? "" : "brightness-0 opacity-50"}`}
+              />
+              {tab.label}
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }

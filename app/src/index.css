@@ -1,12 +1,196 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #16a34a;
-  --color-primary-dark: #15803d;
-  --color-primary-light: #22c55e;
+  /* Primary colors — aligned with client design tokens */
+  --color-primary: #1d4034;
+  --color-primary-dark: #163029;
+  --color-primary-light: #16a368;
 
-  --color-sidebar-bg: #f8fafc;
-  --color-sidebar-border: #e2e8f0;
+  /* Buttons */
+  --color-button: #16a368;
+  --color-button-hover: #1bc47a;
+
+  /* Surfaces & backgrounds */
+  --color-body: #f9f9f9;
+  --color-surface: #fff;
+  --color-surface-muted: #fafdfc;
+
+  /* Sidebar */
+  --color-sidebar-bg: #ffffff;
+  --color-sidebar-border: #e3ebe8;
   --color-sidebar-text: #334155;
   --color-sidebar-text-muted: #94a3b8;
+  --color-sidebar-selected: #e5ebf8;
+  --color-sidebar-hover: #f3f4f6;
+  --color-sidebar-selected-text: #4267b2;
+
+  /* Inputs & borders */
+  --color-input-bg: #e3ebe8;
+  --color-border: #e3ebe8;
+  --color-border-strong: #bbcdc7;
+  --color-ring: #b1d9cb;
+
+  /* Semantic tokens */
+  --color-label-bg: #d7fbe3;
+  --color-label-text: #2fa554;
+  --color-placeholder: #616f6b;
+  --color-text: #333333;
+
+  /* Font families */
+  --font-sans: 'FaktPro', system-ui, sans-serif;
+  --font-fakt: 'FaktPro', sans-serif;
+  --font-gtsuper: 'GTSuper', sans-serif;
+  --font-ddn: 'DDN', sans-serif;
+  --font-dd: 'DD', sans-serif;
+  --font-caslon: 'caslon', sans-serif;
+}
+
+/* FONTS */
+
+@layer base {
+  /* FaktPro */
+  @font-face {
+    font-family: 'FaktPro';
+    src: url('/fonts/Fakt/FaktPro-Blond.ttf') format('truetype');
+    font-weight: 200;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'FaktPro';
+    src: url('/fonts/Fakt/FaktPro-Light.ttf') format('truetype');
+    font-weight: 300;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'FaktPro';
+    src: url('/fonts/Fakt/FaktPro-Normal.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'FaktPro';
+    src: url('/fonts/Fakt/FaktPro-SemiBold.ttf') format('truetype');
+    font-weight: 600;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'FaktPro';
+    src: url('/fonts/Fakt/FaktPro-Black.ttf') format('truetype');
+    font-weight: 900;
+    font-style: normal;
+  }
+
+  /* GTSuper */
+  @font-face {
+    font-family: 'GTSuper';
+    src: url('/fonts/GTSuper/GT-Super-Display-Medium.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+  }
+
+  /* DDN */
+  @font-face {
+    font-family: 'DDN';
+    src: url('/fonts/DDN/DDN-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DDN';
+    src: url('/fonts/DDN/DDN-Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DDN';
+    src: url('/fonts/DDN/DDN-Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DDN';
+    src: url('/fonts/DDN/DDN-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DDN';
+    src: url('/fonts/DDN/DDN-Extrabold.otf') format('opentype');
+    font-weight: 800;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DDN';
+    src: url('/fonts/DDN/DDN-Black.otf') format('opentype');
+    font-weight: 900;
+    font-style: normal;
+  }
+
+  /* DD */
+  @font-face {
+    font-family: 'DD';
+    src: url('/fonts/DD/DD-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DD';
+    src: url('/fonts/DD/DD-Medium.otf') format('opentype');
+    font-weight: 500;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DD';
+    src: url('/fonts/DD/DD-Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DD';
+    src: url('/fonts/DD/DD-Bold.otf') format('opentype');
+    font-weight: 700;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DD';
+    src: url('/fonts/DD/DD-Extrabold.otf') format('opentype');
+    font-weight: 800;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'DD';
+    src: url('/fonts/DD/DD-Black.otf') format('opentype');
+    font-weight: 900;
+    font-style: normal;
+  }
+
+  /* Caslon */
+  @font-face {
+    font-family: 'Caslon';
+    src: url('/fonts/Caslon/ACaslonPro-Regular.otf') format('opentype');
+    font-weight: 400;
+    font-style: normal;
+  }
+  @font-face {
+    font-family: 'Caslon';
+    src: url('/fonts/Caslon/ACaslonPro-Semibold.otf') format('opentype');
+    font-weight: 600;
+    font-style: normal;
+  }
+}
+
+/* Global styles */
+body {
+  color: #333;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar hiding */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
