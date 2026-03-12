@@ -61,17 +61,18 @@ export default function Sidebar({ providerName, providerEmail }: SidebarProps) {
     .slice(0, 2);
 
   return (
-    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar-bg">
+    <aside className="flex h-full w-[220px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar-bg font-fakt">
       {/* Logo */}
       <div className="px-5 pt-5 pb-4">
-        <span className="text-xl font-bold text-primary">Adwene</span>
+        <img src="/icons/kasamd_green.png" className="h-8" alt="KasaMD" />
       </div>
+      <hr className="mx-4 border-sidebar-border" />
 
       {/* Create Session button */}
       <div className="px-3 pb-4">
         <button
           onClick={handleCreateSession}
-          className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark"
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-dark transition-colors"
         >
           <Plus className="h-4 w-4" />
           Create Session
@@ -89,12 +90,12 @@ export default function Sidebar({ providerName, providerEmail }: SidebarProps) {
               key={item.view}
               onClick={() => !isDisabled && setView(item.view)}
               disabled={isDisabled}
-              className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm ${
+              className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
                 isActive
-                  ? "bg-primary/10 font-medium text-primary"
+                  ? "bg-sidebar-selected font-medium text-sidebar-selected-text"
                   : isDisabled
                     ? "cursor-not-allowed text-sidebar-text-muted"
-                    : "text-sidebar-text hover:bg-gray-100"
+                    : "text-sidebar-text hover:bg-sidebar-hover"
               }`}
             >
               {item.icon}
@@ -112,7 +113,7 @@ export default function Sidebar({ providerName, providerEmail }: SidebarProps) {
               connectionState === "connected"
                 ? "bg-green-500"
                 : connectionState === "connecting"
-                  ? "bg-yellow-500"
+                  ? "bg-yellow-500 animate-pulse"
                   : "bg-red-400"
             }`}
           />

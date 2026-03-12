@@ -11,7 +11,7 @@ interface PatientFormProps {
 const GENDER_OPTIONS = ["", "Male", "Female", "Other", "Prefer not to say"];
 
 const inputClass =
-  "w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary";
+  "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring";
 
 export default function PatientForm({
   patient,
@@ -274,14 +274,14 @@ export default function PatientForm({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          className="rounded-lg bg-gray-200 px-4 py-2 text-sm text-gray-700 hover:bg-gray-300 transition-colors"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!isValid || submitting}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+          className="rounded-lg bg-button px-4 py-2 text-sm font-medium text-white hover:bg-button-hover transition-colors disabled:opacity-50"
         >
           {submitting ? "Saving..." : isEdit ? "Update Patient" : "Add Patient"}
         </button>

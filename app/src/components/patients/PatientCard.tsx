@@ -23,10 +23,10 @@ export default function PatientCard({
   return (
     <div
       onClick={() => onSelect(patient)}
-      className={`flex cursor-pointer items-center justify-between rounded-md border px-4 py-3 transition-colors ${
+      className={`flex cursor-pointer items-center justify-between rounded-lg border px-4 py-3 transition-shadow ${
         selected
           ? "border-primary bg-primary/5"
-          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+          : "border-gray-200 hover:shadow-md"
       }`}
     >
       <div className="min-w-0 flex-1">

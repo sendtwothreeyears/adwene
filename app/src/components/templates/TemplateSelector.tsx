@@ -19,7 +19,7 @@ export default function TemplateSelector({
       <select
         value={selectedTemplateId ?? ""}
         onChange={(e) => onChange(e.target.value || null)}
-        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
       >
         <option value="">None</option>
         {templates.map((t) => (

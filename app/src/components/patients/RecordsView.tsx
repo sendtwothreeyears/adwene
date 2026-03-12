@@ -97,10 +97,10 @@ export default function RecordsView() {
   return (
     <div className="mx-auto max-w-2xl">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Records</h1>
+        <h1 className="text-lg font-semibold text-gray-900 font-gtsuper">Records</h1>
         <button
           onClick={handleOpenCreate}
-          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-dark"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-button px-3 py-1.5 text-sm font-medium text-white hover:bg-button-hover transition-colors"
         >
           <Plus className="h-4 w-4" />
           Add Patient

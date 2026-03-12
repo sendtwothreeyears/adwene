@@ -145,7 +145,7 @@ export default function CreateSessionModal() {
         <button
           onClick={handleCreate}
           disabled={submitting}
-          className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+          className="rounded-lg bg-button px-4 py-1.5 text-sm font-medium text-white hover:bg-button-hover transition-colors disabled:opacity-50"
         >
           {submitting ? "Creating..." : "Create Session"}
         </button>

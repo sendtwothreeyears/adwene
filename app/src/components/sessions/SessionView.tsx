@@ -308,7 +308,7 @@ export default function SessionView() {
                   generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
                 }
               }}
-              className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className="rounded-lg bg-button px-3 py-1.5 text-sm font-medium text-white hover:bg-button-hover transition-colors disabled:opacity-50"
             >
               {isGenerating ? (
                 <span className="flex items-center gap-1.5">

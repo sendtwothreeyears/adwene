@@ -24,14 +24,14 @@ export default function Modal({ open, onClose, title, children }: ModalProps) {
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+      <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl font-fakt">
         {title && (
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">{title}</h2>
+          <h2 className="mb-4 text-lg font-semibold text-gray-900 font-gtsuper">{title}</h2>
         )}
         {children}
       </div>

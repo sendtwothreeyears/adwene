@@ -70,7 +70,7 @@ export default function TemplateEditor({
         className={`rounded-md border ${
           readOnly
             ? "border-gray-200 bg-gray-50"
-            : "border-gray-300 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary"
+            : "border-gray-300 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring"
         }`}
       >
         <RichTextPlugin
