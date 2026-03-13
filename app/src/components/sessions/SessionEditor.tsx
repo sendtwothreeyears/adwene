@@ -16,8 +16,9 @@ import { LinkNode } from "@lexical/link";
 import { CodeNode } from "@lexical/code";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { EditorState, SerializedEditorState } from "lexical";
+import { ClinicalEntityNode } from "../../lib/clinicalEntityNode";
 
-const EDITOR_NODES = [ListNode, ListItemNode, LinkNode, CodeNode, HeadingNode, QuoteNode];
+const EDITOR_NODES = [ListNode, ListItemNode, LinkNode, CodeNode, HeadingNode, QuoteNode, ClinicalEntityNode];
 
 /** Loads an existing Lexical editor state into the editor on mount. */
 function LoadStatePlugin({

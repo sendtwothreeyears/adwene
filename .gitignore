@@ -6,11 +6,12 @@ notes/
 # Project-specific
 docs/
 server/
+client/
 guidelines/
 api_key.txt
 training_data.jsonl
 fine-tuning/
-
+evals/
 # Python
 .venv/
 venv/
@@ -36,3 +37,6 @@ dist/
 # Runtime & logs
 *.db
 *.log
+
+models/
+roadmap/

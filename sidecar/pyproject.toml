@@ -1,0 +1,22 @@
+[project]
+name = "adwene-sidecar"
+version = "0.1.0"
+description = "Python sidecar for Adwene — MedASR and Gemma engine host"
+requires-python = ">=3.10"
+dependencies = [
+    "websockets>=12.0",
+    "mlx>=0.20",
+    "mlx-audio>=0.4.0",
+    "mlx-lm>=0.25",
+    "numpy>=1.24",
+    "pyctcdecode @ git+https://github.com/mediacatch/pyctcdecode.git@ff49fc56",
+    "camel-kenlm",
+    "anthropic>=0.84.0",
+    "google-genai>=1.67.0",
+]
+
+[tool.uv]
+prerelease = "allow"
+
+[project.scripts]
+adwene-sidecar = "sidecar.src.server:main"

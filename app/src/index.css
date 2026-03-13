@@ -186,6 +186,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Clinical entity highlights */
+.clinical-entity {
+  border-radius: 3px;
+  padding: 1px 3px;
+  font-weight: 500;
+}
+.clinical-entity-drug {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+.clinical-entity-condition {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
 /* Scrollbar hiding */
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
