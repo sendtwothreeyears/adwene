@@ -412,20 +412,28 @@ const SYSTEM_TEMPLATES = [
 export async function seedSystemTemplates(): Promise<void> {
   // listTemplates includes system templates (isSystem=1) for any providerId
   const existing = await db.listTemplates("__seed_check__");
-  const existingNames = new Set(
-    existing.filter((t) => t.isSystem).map((t) => t.name),
+  const existingByName = new Map(
+    existing.filter((t) => t.isSystem).map((t) => [t.name, t]),
   );
 
   for (const tmpl of SYSTEM_TEMPLATES) {
-    if (existingNames.has(tmpl.name)) continue;
-
     const content = await createEditorStateFromLines(tmpl.lines);
-    await db.createTemplate({
-      name: tmpl.name,
-      description: tmpl.description,
-      content,
-      isSystem: true,
-      providerId: null,
-    });
+    const existingTmpl = existingByName.get(tmpl.name);
+
+    if (existingTmpl) {
+      // Update existing system template to latest content (e.g. markdown headings migration)
+      await db.updateTemplate(existingTmpl.id, {
+        content,
+        description: tmpl.description,
+      });
+    } else {
+      await db.createTemplate({
+        name: tmpl.name,
+        description: tmpl.description,
+        content,
+        isSystem: true,
+        providerId: null,
+      });
+    }
   }
 }

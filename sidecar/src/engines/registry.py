@@ -17,6 +17,7 @@ _ASR_ENGINES: dict[str, str] = {
 
 _NOTE_ENGINES: dict[str, str] = {
     "gemma": "src.engines.gemma_engine.GemmaEngine",
+    "medgemma": "src.engines.medgemma_engine.MedGemmaEngine",
 }
 
 

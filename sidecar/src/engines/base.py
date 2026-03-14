@@ -21,7 +21,7 @@ class ASREngine(ABC):
 
 
 class NoteEngine(ABC):
-    """Abstract base for note generation engines (e.g., Gemma 3N)."""
+    """Abstract base for note generation engines (e.g., MedGemma-4B)."""
 
     @abstractmethod
     async def load(self) -> None:

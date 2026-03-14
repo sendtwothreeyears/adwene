@@ -1,4 +1,4 @@
-"""Gemma 3N note generation engine — transcript to SOAP note via MLX."""
+"""MedGemma-4B note generation engine — transcript to SOAP note via MLX."""
 
 import asyncio
 import logging
@@ -14,27 +14,27 @@ logger = logging.getLogger("adwene-sidecar")
 GENERATE_TIMEOUT_S = 120
 
 
-class GemmaEngine(NoteEngine):
-    """NoteEngine backed by Gemma 3N E2B via MLX (Metal GPU)."""
+class MedGemmaEngine(NoteEngine):
+    """NoteEngine backed by MedGemma-4B via MLX (Metal GPU)."""
 
     def __init__(self) -> None:
         self._model = None
         self._tokenizer = None
 
     async def load(self) -> None:
-        logger.info("Loading Gemma model: %s", config.GEMMA_MODEL_ID)
+        logger.info("Loading MedGemma model: %s", config.MEDGEMMA_MODEL_ID)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, self._load_sync)
-        logger.info("Gemma model loaded (MLX Metal GPU)")
+        logger.info("MedGemma model loaded (MLX Metal GPU)")
 
     def _load_sync(self) -> None:
         from mlx_lm import load
 
-        self._model, self._tokenizer = load(config.GEMMA_MODEL_ID)
+        self._model, self._tokenizer = load(config.MEDGEMMA_MODEL_ID)
 
     async def generate(self, transcript: str, template: str) -> str:
         if self._model is None:
-            raise RuntimeError("Gemma engine not loaded — call load() first")
+            raise RuntimeError("MedGemma engine not loaded — call load() first")
 
         loop = asyncio.get_running_loop()
         return await asyncio.wait_for(
@@ -49,9 +49,9 @@ class GemmaEngine(NoteEngine):
         if template:
             system += f"\n\nAdditional formatting instructions: {template}"
 
-        # Gemma has no system role — prepend instructions to the user message
         messages = [
-            {"role": "user", "content": f"{system}\n\nTranscript:\n{transcript}"},
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"Transcript:\n{transcript}"},
         ]
 
         prompt = self._tokenizer.apply_chat_template(
@@ -69,7 +69,7 @@ class GemmaEngine(NoteEngine):
         self, transcript: str, template: str
     ) -> AsyncIterator[str]:
         if self._model is None:
-            raise RuntimeError("Gemma engine not loaded — call load() first")
+            raise RuntimeError("MedGemma engine not loaded — call load() first")
 
         loop = asyncio.get_running_loop()
 
@@ -78,7 +78,8 @@ class GemmaEngine(NoteEngine):
             system += f"\n\nAdditional formatting instructions: {template}"
 
         messages = [
-            {"role": "user", "content": f"{system}\n\nTranscript:\n{transcript}"},
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"Transcript:\n{transcript}"},
         ]
 
         prompt = self._tokenizer.apply_chat_template(
@@ -116,4 +117,4 @@ class GemmaEngine(NoteEngine):
     async def unload(self) -> None:
         self._model = None
         self._tokenizer = None
-        logger.info("Gemma model unloaded")
+        logger.info("MedGemma model unloaded")
