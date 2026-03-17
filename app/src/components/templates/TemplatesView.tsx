@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, MoreVertical, X } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Plus, Trash2, MoreVertical, X, Search } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import * as db from "../../lib/db";
 import type { Template } from "../../types";
@@ -23,6 +23,9 @@ export default function TemplatesView() {
   const [createDescription, setCreateDescription] = useState("");
   const [createContent, setCreateContent] = useState<SerializedEditorState | null>(null);
   const [creating, setCreating] = useState(false);
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Menu
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
@@ -52,6 +55,16 @@ export default function TemplatesView() {
     window.addEventListener("click", close);
     return () => window.removeEventListener("click", close);
   }, [menuOpenId]);
+
+  const filteredTemplates = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return templates;
+    return templates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        (t.description && t.description.toLowerCase().includes(q)),
+    );
+  }, [templates, searchQuery]);
 
   async function handleDelete(template: Template) {
     if (template.isSystem) return;
@@ -120,7 +133,21 @@ export default function TemplatesView() {
         </div>
       )}
 
-      {/* Template grid */}
+      {/* Search input */}
+      {!loading && templates.length > 0 && (
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search templates..."
+            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+        </div>
+      )}
+
+      {/* Template list */}
       {loading ? (
         <div className="py-12 text-center text-sm text-gray-400">
           Loading templates...
@@ -129,62 +156,34 @@ export default function TemplatesView() {
         <div className="py-12 text-center text-sm text-gray-400">
           No templates yet. Click "Create Template" to create one.
         </div>
+      ) : filteredTemplates.length === 0 ? (
+        <div className="py-12 text-center text-sm text-gray-400">
+          No templates match your search.
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {templates.map((template) => (
+        <div className="flex flex-col divide-y divide-gray-200 rounded-lg border border-gray-200">
+          {filteredTemplates.map((template) => (
             <div
               key={template.id}
               onClick={() => setViewingTemplate(template)}
-              className="relative flex cursor-pointer flex-col justify-between rounded-lg border border-gray-200 p-4 transition-shadow hover:shadow-md"
+              className="relative flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-gray-50"
             >
-              {/* Three-dot menu */}
-              {!template.isSystem && (
-                <div className="absolute top-3 right-3">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpenId(
-                        menuOpenId === template.id ? null : template.id,
-                      );
-                    }}
-                    className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
-                  {menuOpenId === template.id && (
-                    <div className="absolute right-0 mt-1 w-32 rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMenuOpenId(null);
-                          handleDelete(template);
-                        }}
-                        className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Card content */}
-              <div className="pr-6">
-                <h3 className="text-sm font-semibold text-gray-900">
+              {/* Left: name + description */}
+              <div className="min-w-0 flex-1 pr-4">
+                <h3 className="truncate text-sm font-semibold text-gray-900">
                   {template.name}
                 </h3>
                 {template.description && (
-                  <p className="mt-1 line-clamp-2 text-xs text-gray-500">
+                  <p className="mt-0.5 truncate text-xs text-gray-500">
                     {template.description}
                   </p>
                 )}
               </div>
 
-              {/* Footer */}
-              <div className="mt-3 flex items-center justify-between">
+              {/* Right: date + badge + menu */}
+              <div className="flex shrink-0 items-center gap-3">
                 <span className="text-xs text-gray-400">
-                  Updated {formatDate(template.updatedAt)}
+                  {formatDate(template.updatedAt)}
                 </span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -195,6 +194,36 @@ export default function TemplatesView() {
                 >
                   {template.isSystem ? "Adwene Default" : "Custom"}
                 </span>
+                {!template.isSystem && (
+                  <div className="relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpenId(
+                          menuOpenId === template.id ? null : template.id,
+                        );
+                      }}
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                    {menuOpenId === template.id && (
+                      <div className="absolute right-0 mt-1 w-32 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMenuOpenId(null);
+                            handleDelete(template);
+                          }}
+                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}

@@ -23,7 +23,7 @@ export default function TranscriptPanel({
   return (
     <div
       ref={scrollRef}
-      className="min-h-[200px] max-h-[60vh] overflow-y-auto rounded-md border border-gray-200 bg-gray-50 px-4 py-3"
+      className="h-full overflow-y-auto rounded-md border border-border bg-white px-4 py-3"
     >
       {hasText && (
         <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-900">
