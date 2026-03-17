@@ -9,6 +9,9 @@ import SessionEditor from "./SessionEditor";
 import TranscriptPanel from "./TranscriptPanel";
 import NoteToolbar from "./NoteToolbar";
 import { useAudioCapture } from "../../hooks/useAudioCapture";
+import { useAudioDevices } from "../../hooks/useAudioDevices";
+import { useAudioPreview } from "../../hooks/useAudioPreview";
+import { useRecordingTimer } from "../../hooks/useRecordingTimer";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useNoteGeneration } from "../../hooks/useNoteGeneration";
 import { useSidecar } from "../../contexts/SidecarContext";
@@ -66,6 +69,18 @@ export default function SessionView() {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const {
+    devices,
+    selectedDeviceId,
+    permissionState,
+    selectDevice,
+    requestPermission,
+  } = useAudioDevices();
+
+  const audioPreviewStream = useAudioPreview(
+    permissionState === "granted" ? selectedDeviceId : null
+  );
+
+  const {
     transcript: _transcript,
     isTranscribing,
     error: transcriptionError,
@@ -76,11 +91,17 @@ export default function SessionView() {
 
   const {
     state: captureState,
-    audioLevel,
     start,
     stop,
+    switchDevice,
     error: captureError,
-  } = useAudioCapture({ onChunk: sendAudioChunk });
+  } = useAudioCapture({ onChunk: sendAudioChunk, deviceId: selectedDeviceId });
+
+  const {
+    formattedTime: recordingTime,
+    start: startTimer,
+    stop: stopTimer,
+  } = useRecordingTimer();
 
   const {
     isGenerating,
@@ -93,6 +114,16 @@ export default function SessionView() {
 
   const { connectionState } = useSidecar();
   const sidecarConnected = connectionState === "connected";
+
+  const handleSelectDevice = useCallback(
+    (deviceId: string | null) => {
+      selectDevice(deviceId);
+      if (captureState === "recording") {
+        switchDevice(deviceId);
+      }
+    },
+    [selectDevice, switchDevice, captureState]
+  );
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSaveRef = useRef<{ sessionId: string; field: string; state: SerializedEditorState } | null>(null);
@@ -177,21 +208,26 @@ export default function SessionView() {
     if (!activeSession) return;
     setActiveTab("transcription");
     startTranscription(activeSession.id);
+    startTimer();
     await start();
-  }, [activeSession, start, startTranscription]);
+  }, [activeSession, start, startTranscription, startTimer]);
 
   const handleStopRecording = useCallback(async () => {
+    stopTimer();
     await stop();
     const text = await stopTranscription();
     if (text && activeSession) {
       try {
         await db.updateSession(activeSession.id, { rawTranscript: text });
         mergeActiveSession(activeSession.id, { rawTranscript: text });
+        if (!activeSession.notes) {
+          generateNote(activeSession.id, text, "");
+        }
       } catch (err) {
         console.error("Failed to save rawTranscript:", err);
       }
     }
-  }, [stop, stopTranscription, activeSession, mergeActiveSession]);
+  }, [stop, stopTranscription, activeSession, mergeActiveSession, generateNote]);
 
   const handleEditorChange = useCallback(
     (state: SerializedEditorState) => {
@@ -273,7 +309,13 @@ export default function SessionView() {
         isRecording={captureState === "recording"}
         isTranscribing={isTranscribing}
         sidecarConnected={sidecarConnected}
-        audioLevel={audioLevel}
+        devices={devices}
+        selectedDeviceId={selectedDeviceId}
+        permissionState={permissionState}
+        onSelectDevice={handleSelectDevice}
+        onRequestPermission={requestPermission}
+        audioPreviewStream={audioPreviewStream}
+        recordingTime={recordingTime}
         onStart={handleStartRecording}
         onStop={handleStopRecording}
         confirmDelete={confirmDelete}

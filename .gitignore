@@ -1,13 +1,14 @@
 # Claude Code
 CLAUDE.md
 .claude/
-notes/
+_web
+tasks
 
 # Project-specific
 docs/
+plan/
 server/
 client/
-guidelines/
 api_key.txt
 training_data.jsonl
 fine-tuning/
@@ -39,4 +40,3 @@ dist/
 *.log
 
 models/
-roadmap/

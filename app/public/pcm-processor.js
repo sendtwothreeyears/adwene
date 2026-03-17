@@ -25,11 +25,6 @@ class PcmProcessor extends AudioWorkletProcessor {
     this._dcPrev = 0;
     this._dcPrevInput = 0;
 
-    // Throttle level messages: accumulate RMS across blocks, emit every ~50ms
-    this._levelSum = 0;
-    this._levelCount = 0;
-    this._levelInterval = Math.ceil(sampleRate / 128 / 20); // ~20 updates/sec
-
     this.port.onmessage = (event) => {
       if (event.data === 'flush') {
         this._flush();
@@ -47,9 +42,6 @@ class PcmProcessor extends AudioWorkletProcessor {
     }
 
     const channel = input[0]; // mono — first channel only
-
-    // Post RMS level for the UI meter
-    this._postLevel(channel);
 
     if (this._resampleStep <= 1.0) {
       // Audio is already at target rate (AudioContext created at 16kHz)
@@ -144,24 +136,6 @@ class PcmProcessor extends AudioWorkletProcessor {
     return int16;
   }
 
-  /**
-   * Accumulate RMS energy and post to main thread at ~20Hz for the level meter.
-   */
-  _postLevel(channel) {
-    let sum = 0;
-    for (let i = 0; i < channel.length; i++) {
-      sum += channel[i] * channel[i];
-    }
-    this._levelSum += sum / channel.length;
-    this._levelCount++;
-
-    if (this._levelCount >= this._levelInterval) {
-      const rms = Math.sqrt(this._levelSum / this._levelCount);
-      this.port.postMessage({ type: 'level', rms });
-      this._levelSum = 0;
-      this._levelCount = 0;
-    }
-  }
 }
 
 registerProcessor('pcm-processor', PcmProcessor);
