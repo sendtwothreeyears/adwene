@@ -13,12 +13,12 @@ class TestSystemPromptStructure:
     def test_contains_role_identity(self):
         assert "clinical documentation assistant" in SYSTEM_PROMPT
 
-    def test_contains_bold_formatting_instruction(self):
-        assert "bold" in SYSTEM_PROMPT.lower() or "**" in SYSTEM_PROMPT
+    def test_contains_heading_formatting_instruction(self):
+        assert "markdown headings" in SYSTEM_PROMPT.lower() or "# " in SYSTEM_PROMPT
 
     def test_contains_few_shot_example(self):
-        assert "**Subjective**" in SYSTEM_PROMPT
-        assert "**Objective**" in SYSTEM_PROMPT
+        assert "# Subjective" in SYSTEM_PROMPT
+        assert "# Objective" in SYSTEM_PROMPT
 
     def test_no_entity_tagging_instructions(self):
         assert "{{drug:" not in SYSTEM_PROMPT
