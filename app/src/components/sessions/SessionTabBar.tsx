@@ -3,6 +3,8 @@ export type SessionTab = "context" | "transcription" | "note";
 interface SessionTabBarProps {
   activeTab: SessionTab;
   onTabChange: (tab: SessionTab) => void;
+  /** When true, lock user on the current tab (e.g. during recording). */
+  locked?: boolean;
 }
 
 const tabs: { id: SessionTab; label: string; icon: string }[] = [
@@ -18,20 +20,25 @@ function Separator() {
 export default function SessionTabBar({
   activeTab,
   onTabChange,
+  locked = false,
 }: SessionTabBarProps) {
   return (
     <div className="flex items-center py-2">
       {tabs.map((tab, i) => {
         const isActive = activeTab === tab.id;
+        const disabled = locked && !isActive;
         return (
           <div key={tab.id} className="flex items-center">
             {i > 0 && <Separator />}
             <button
+              disabled={disabled}
               onClick={() => onTabChange(tab.id)}
               className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-base font-medium transition-colors ${
                 isActive
                   ? "border-border bg-white text-gray-900"
-                  : "border-transparent text-gray-500 hover:border-border"
+                  : disabled
+                    ? "cursor-not-allowed border-transparent text-gray-300"
+                    : "border-transparent text-gray-500 hover:border-border"
               }`}
             >
               <img

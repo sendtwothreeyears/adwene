@@ -757,7 +757,7 @@ export default function SessionView() {
         onDeleteCancel={() => setConfirmDelete(false)}
       />
 
-      <SessionTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <SessionTabBar activeTab={activeTab} onTabChange={setActiveTab} locked={isLiveTranscribing} />
 
       {/* Patient context (read-only) — shown above editor on context tab */}
       {activeTab === "context" && patient?.context && (
