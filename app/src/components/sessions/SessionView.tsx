@@ -16,12 +16,15 @@ import { useTranscription } from "../../hooks/useTranscription";
 import { useNoteGeneration } from "../../hooks/useNoteGeneration";
 import { useSidecar } from "../../contexts/SidecarContext";
 import { useTextExtraction } from "../../hooks/useTextExtraction";
+import { usePdfExport } from "../../hooks/usePdfExport";
 import { markdownToLexical } from "../../lib/markdown-to-lexical";
+import { lexicalToHtml } from "../../lib/lexical-to-html";
 import ContextAttachments, { type AttachmentWithStatus } from "./ContextAttachments";
 import QuickPatientModal from "../patients/QuickPatientModal";
 import Toast from "../ui/Toast";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { copyFile, mkdir, remove, stat } from "@tauri-apps/plugin-fs";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
+import { copyFile, mkdir, remove, stat, writeFile } from "@tauri-apps/plugin-fs";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { appDataDir } from "@tauri-apps/api/path";
 
 /** Extract plain text from a serialized Lexical editor state. */
@@ -80,6 +83,7 @@ export default function SessionView() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<AttachmentWithStatus[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [showQuickPatient, setShowQuickPatient] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error"; visible: boolean }>({ message: "", variant: "success", visible: false });
@@ -132,6 +136,7 @@ export default function SessionView() {
 
   const { connectionState, send, onMessage } = useSidecar();
   const { extractText } = useTextExtraction();
+  const { generatePdf } = usePdfExport();
   const sidecarConnected = connectionState === "connected";
 
   const handleSelectDevice = useCallback(
@@ -578,6 +583,73 @@ export default function SessionView() {
     }
   }, [activeTab, activeSession, extractText, sidecarConnected]);
 
+  const handleExportPDF = useCallback(async () => {
+    if (!activeSession?.notes) return;
+    if (!sidecarConnected) {
+      setError("Sidecar not connected — cannot generate PDF.");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      // Convert Lexical state to HTML
+      const notes = activeSession.notes as SerializedEditorState;
+      const html = lexicalToHtml(notes);
+
+      // Fetch provider data for footer
+      const provider = await db.getProvider();
+
+      // Generate PDF via sidecar
+      const pdfBase64 = await generatePdf(
+        html,
+        {
+          firstName: provider?.firstName,
+          lastName: provider?.lastName,
+          providerType: provider?.providerType,
+          signature: provider?.signature,
+        },
+        activeSession.title
+      );
+
+      // Decode base64 to bytes
+      const binaryStr = atob(pdfBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      // Show Save As dialog
+      const defaultName = (activeSession.title ?? "note").replace(/[/\\?%*:|"<>]/g, "_");
+      const savePath = await saveDialog({
+        defaultPath: `${defaultName}.pdf`,
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+
+      if (!savePath) {
+        // User cancelled
+        return;
+      }
+
+      // Write file
+      await writeFile(savePath, bytes);
+
+      // Open in system viewer
+      try {
+        await openPath(savePath);
+      } catch {
+        // Non-critical — file was saved successfully
+      }
+
+      setToast({ message: "PDF exported successfully", variant: "success", visible: true });
+    } catch (err) {
+      console.error("PDF export failed:", err);
+      const message = err instanceof Error ? err.message : "PDF export failed";
+      setToast({ message, variant: "error", visible: true });
+    } finally {
+      setIsExporting(false);
+    }
+  }, [activeSession, sidecarConnected, generatePdf]);
+
   return (
     <div
       className="flex h-full flex-col relative"
@@ -691,10 +763,12 @@ export default function SessionView() {
                     <NoteToolbar
                       hasNote={!!activeSession.notes}
                       isGenerating={isGenerating}
+                      isExporting={isExporting}
                       canGenerate={!!activeSession.rawTranscript}
                       templates={templates}
                       selectedTemplateId={selectedTemplateId}
                       onTemplateChange={setSelectedTemplateId}
+                      onExportPDF={handleExportPDF}
                       onCopy={() => {
                         const notes = activeSession.notes as SerializedEditorState | null;
                         if (!notes) return;

@@ -18,6 +18,7 @@ import websockets
 
 from . import config, protocol
 from .engines.registry import create_asr_engine, create_note_engine
+from .pdf_generator import generate_pdf
 from .text_extraction import extract_text
 from .vad import SileroVAD
 
@@ -411,6 +412,40 @@ async def handler(websocket):
                         "type": protocol.TEXT_EXTRACTED,
                         "request_id": request_id,
                         "text": "",
+                        "error": str(exc),
+                    })
+
+            elif msg_type == protocol.GENERATE_PDF:
+                request_id = data.get("request_id", "")
+                html = data.get("html", "")
+                provider = data.get("provider") or {}
+                session_title = data.get("session_title")
+
+                if not html:
+                    await _send_json(websocket, {
+                        "type": protocol.PDF_ERROR,
+                        "request_id": request_id,
+                        "error": "html is required",
+                    })
+                    continue
+
+                try:
+                    loop = asyncio.get_running_loop()
+                    pdf_bytes = await loop.run_in_executor(
+                        None, generate_pdf, html, provider, session_title
+                    )
+                    import base64 as _b64
+                    pdf_b64 = _b64.b64encode(pdf_bytes).decode("ascii")
+                    await _send_json(websocket, {
+                        "type": protocol.PDF_READY,
+                        "request_id": request_id,
+                        "data": pdf_b64,
+                    })
+                except Exception as exc:
+                    logger.exception("PDF generation failed")
+                    await _send_json(websocket, {
+                        "type": protocol.PDF_ERROR,
+                        "request_id": request_id,
                         "error": str(exc),
                     })
 

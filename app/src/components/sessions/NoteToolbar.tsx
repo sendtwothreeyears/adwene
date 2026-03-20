@@ -5,7 +5,9 @@ import TemplateSelectorModal from "../templates/TemplateSelectorModal";
 interface NoteToolbarProps {
   hasNote: boolean;
   isGenerating: boolean;
+  isExporting: boolean;
   onCopy: () => void;
+  onExportPDF: () => void;
   onRegenerate: () => void;
   canGenerate: boolean;
   templates: Template[];
@@ -16,7 +18,9 @@ interface NoteToolbarProps {
 export default function NoteToolbar({
   hasNote,
   isGenerating,
+  isExporting,
   onCopy,
+  onExportPDF,
   onRegenerate,
   canGenerate,
   templates,
@@ -64,11 +68,13 @@ export default function NoteToolbar({
         <OptionsMenu
           hasNote={hasNote}
           isGenerating={isGenerating}
+          isExporting={isExporting}
           onCopy={onCopy}
+          onExportPDF={onExportPDF}
           onRegenerate={onRegenerate}
           canGenerate={canGenerate}
         />
-        {isGenerating && (
+        {(isGenerating || isExporting) && (
           <div className="ml-1 h-5 w-5 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
         )}
       </div>
@@ -98,13 +104,17 @@ export default function NoteToolbar({
 function OptionsMenu({
   hasNote,
   isGenerating,
+  isExporting,
   onCopy,
+  onExportPDF,
   onRegenerate,
   canGenerate,
 }: {
   hasNote: boolean;
   isGenerating: boolean;
+  isExporting: boolean;
   onCopy: () => void;
+  onExportPDF: () => void;
   onRegenerate: () => void;
   canGenerate: boolean;
 }) {
@@ -169,6 +179,17 @@ function OptionsMenu({
             }`}
           >
             Copy Note
+          </button>
+
+          <button
+            type="button"
+            onClick={() => act(onExportPDF, !hasNote || isExporting)}
+            disabled={!hasNote || isExporting}
+            className={`w-full px-4 py-2 text-left text-sm transition-colors ${
+              hasNote && !isExporting ? "text-gray-900 hover:bg-gray-50" : "cursor-not-allowed text-gray-400"
+            }`}
+          >
+            {isExporting ? "Exporting..." : "Export as PDF"}
           </button>
 
           <div className="my-1 border-t border-gray-200" />
