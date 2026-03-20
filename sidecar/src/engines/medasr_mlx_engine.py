@@ -323,3 +323,50 @@ def _extract_features(
     log_mel = np.log(mel_spec)
 
     return log_mel.astype(np.float32)
+
+
+def _extract_features_chunked(
+    audio: np.ndarray,
+    mel_filters: np.ndarray,
+    chunk_duration: float = 20.0,
+    sample_rate: int = SAMPLE_RATE,
+    n_fft: int = 512,
+    hop_length: int = 160,
+    win_length: int = 400,
+) -> np.ndarray:
+    """Extract log-mel spectrogram in chunks to bound peak memory.
+
+    Splits the work into groups of STFT frames (not raw samples) so that
+    the chunked output has exactly the same number of frames — and the
+    same sample positions — as a single-pass call to `_extract_features`.
+    Peak numpy memory stays ≈21 MB per chunk regardless of recording length.
+
+    Returns the same ``(T, n_mel)`` float32 array as `_extract_features`.
+    """
+    n_total_frames = 1 + (len(audio) - win_length) // hop_length
+    if n_total_frames <= 0:
+        return np.zeros((1, mel_filters.shape[1]), dtype=np.float32)
+
+    frames_per_chunk = max(1, int(chunk_duration * sample_rate) // hop_length)
+
+    if n_total_frames <= frames_per_chunk:
+        return _extract_features(audio, mel_filters, n_fft, hop_length, win_length)
+
+    parts: list[np.ndarray] = []
+    f_start = 0
+
+    while f_start < n_total_frames:
+        f_end = min(f_start + frames_per_chunk, n_total_frames)
+        # Audio slice for these frames: first sample of first frame to
+        # last sample of last frame's window.
+        audio_start = f_start * hop_length
+        audio_end = (f_end - 1) * hop_length + win_length
+        chunk_audio = audio[audio_start:audio_end]
+
+        features = _extract_features(
+            chunk_audio, mel_filters, n_fft, hop_length, win_length,
+        )
+        parts.append(features)
+        f_start = f_end
+
+    return np.concatenate(parts, axis=0)
