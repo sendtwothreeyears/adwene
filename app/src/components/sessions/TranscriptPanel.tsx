@@ -6,6 +6,7 @@ interface TranscriptPanelProps {
   finalTranscript: string | null;
   isTranscribing: boolean;
   isRecording: boolean;
+  isRefining?: boolean;
 }
 
 export default function TranscriptPanel({
@@ -14,6 +15,7 @@ export default function TranscriptPanel({
   finalTranscript,
   isTranscribing,
   isRecording,
+  isRefining = false,
 }: TranscriptPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isCopied, setIsCopied] = useState(false);
@@ -82,6 +84,13 @@ export default function TranscriptPanel({
           <div className="flex items-center gap-2 pt-2 text-sm text-gray-500">
             <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-amber-400" />
             Finalizing transcript…
+          </div>
+        )}
+
+        {isRefining && (
+          <div className="flex items-center gap-2 pt-2 text-sm text-gray-500">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />
+            Refining transcript…
           </div>
         )}
 

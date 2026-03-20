@@ -107,6 +107,7 @@ export default function SessionView() {
     liveTranscript,
     finalTranscript,
     isTranscribing,
+    isRefining,
     error: transcriptionError,
     startTranscription,
     stopTranscription,
@@ -751,6 +752,7 @@ export default function SessionView() {
             finalTranscript={finalTranscript}
             isTranscribing={isTranscribing}
             isRecording={captureState === "recording"}
+            isRefining={isRefining}
           />
         ) : (
           <SessionEditor
