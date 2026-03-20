@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Plus, Trash2, MoreVertical, X, Search } from "lucide-react";
+import { Plus, Trash2, Pencil, Copy, Star, Upload, MoreHorizontal, Search } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import * as db from "../../lib/db";
 import type { Template } from "../../types";
 import type { SerializedEditorState } from "lexical";
-import Modal from "../ui/Modal";
-import TemplateEditor from "./TemplateEditor";
+import TemplateModal from "./TemplateModal";
+import ConfirmModal from "../ui/ConfirmModal";
+
+type FilterTab = "all" | "system" | "custom";
 
 export default function TemplatesView() {
   const providerId = useAppStore((s) => s.providerId);
@@ -14,21 +16,19 @@ export default function TemplatesView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // View modal
-  const [viewingTemplate, setViewingTemplate] = useState<Template | null>(null);
+  // Edit/view modal
+  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createDescription, setCreateDescription] = useState("");
-  const [createContent, setCreateContent] = useState<SerializedEditorState | null>(null);
-  const [creating, setCreating] = useState(false);
 
-  // Search
+  // Search & filter
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
-  // Menu
+  // Menu & delete confirmation
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+  const [deletingTemplate, setDeletingTemplate] = useState<Template | null>(null);
 
   const loadTemplates = useCallback(async () => {
     if (!providerId) return;
@@ -48,61 +48,129 @@ export default function TemplatesView() {
     loadTemplates();
   }, [loadTemplates]);
 
-  // Close menu on outside click
+  // Close menu on outside click (use mousedown to avoid race with the opening click)
   useEffect(() => {
     if (!menuOpenId) return;
-    const close = () => setMenuOpenId(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
+    const close = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-menu-container]")) return;
+      setMenuOpenId(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
   }, [menuOpenId]);
 
   const filteredTemplates = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return templates;
-    return templates.filter(
-      (t) =>
-        t.name.toLowerCase().includes(q) ||
-        (t.description && t.description.toLowerCase().includes(q)),
-    );
-  }, [templates, searchQuery]);
+    let list = templates;
 
-  async function handleDelete(template: Template) {
-    if (template.isSystem) return;
-    if (!confirm(`Delete template "${template.name}"?`)) return;
+    // Tab filter
+    if (activeTab === "system") list = list.filter((t) => t.isSystem);
+    else if (activeTab === "custom") list = list.filter((t) => !t.isSystem);
+
+    // Search filter
+    const q = searchQuery.toLowerCase().trim();
+    if (q) {
+      list = list.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          (t.description && t.description.toLowerCase().includes(q)),
+      );
+    }
+
+    return list;
+  }, [templates, searchQuery, activeTab]);
+
+  async function handleDeleteConfirm() {
+    if (!deletingTemplate) return;
     try {
-      await db.deleteTemplate(template.id);
+      await db.deleteTemplate(deletingTemplate.id);
+      setDeletingTemplate(null);
       await loadTemplates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete template");
+      setDeletingTemplate(null);
     }
   }
 
-  function handleOpenCreate() {
-    setCreateName("");
-    setCreateDescription("");
-    setCreateContent(null);
-    setShowCreate(true);
-  }
-
-  async function handleCreate() {
-    if (!providerId || !createName.trim() || !createContent) return;
+  async function handleCreateSave(data: {
+    name: string;
+    description: string | null;
+    content: SerializedEditorState;
+    tags: string[];
+  }) {
+    if (!providerId) return;
     try {
-      setCreating(true);
       setError(null);
-      await db.createTemplate({
-        name: createName.trim(),
-        description: createDescription.trim() || null,
-        content: createContent,
+      const template = await db.createTemplate({
+        name: data.name,
+        description: data.description,
+        content: data.content,
         isSystem: false,
         providerId,
       });
+      if (data.tags.length > 0) {
+        await db.setTagsForTemplate(template.id, data.tags);
+      }
       setShowCreate(false);
       await loadTemplates();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create template");
-    } finally {
-      setCreating(false);
     }
+  }
+
+  async function handleEditSave(data: {
+    name: string;
+    description: string | null;
+    content: SerializedEditorState;
+    tags: string[];
+  }) {
+    if (!editingTemplate) return;
+    try {
+      setError(null);
+      await db.updateTemplate(editingTemplate.id, {
+        name: data.name,
+        description: data.description,
+        content: data.content,
+      });
+      await db.setTagsForTemplate(editingTemplate.id, data.tags);
+      setEditingTemplate(null);
+      await loadTemplates();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update template");
+    }
+  }
+
+  async function handleDuplicate(template: Template) {
+    if (!providerId) return;
+    try {
+      setError(null);
+      const created = await db.createTemplate({
+        name: `${template.name} (Copy)`,
+        description: template.description,
+        content: template.content,
+        isSystem: false,
+        providerId,
+      });
+      await loadTemplates();
+      setEditingTemplate(created);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to duplicate template");
+    }
+  }
+
+  function handleExport(template: Template) {
+    const data = JSON.stringify(
+      { name: template.name, description: template.description, content: template.content },
+      null,
+      2,
+    );
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${template.name.replace(/[^a-zA-Z0-9]/g, "_")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function formatDate(iso: string) {
@@ -113,18 +181,44 @@ export default function TemplatesView() {
     });
   }
 
+  const tabs: { key: FilterTab; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "system", label: "KasaMD" },
+    { key: "custom", label: "Custom" },
+  ];
+
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 font-gtsuper">Templates</h1>
         <button
-          onClick={handleOpenCreate}
+          onClick={() => setShowCreate(true)}
           className="inline-flex items-center gap-1.5 rounded-lg bg-button px-4 py-2 text-sm font-medium text-white hover:bg-button-hover transition-colors"
         >
           <Plus className="h-4 w-4" />
           Create Template
         </button>
+      </div>
+
+      {/* Filter tabs */}
+      <div className="mb-4 flex items-center gap-6 border-b border-gray-200">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`relative pb-2.5 text-sm font-medium transition-colors ${
+              activeTab === tab.key
+                ? "text-gray-900"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+          >
+            {tab.label}
+            {activeTab === tab.key && (
+              <span className="absolute inset-x-0 bottom-0 h-0.5 bg-gray-900 rounded-full" />
+            )}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -141,13 +235,13 @@ export default function TemplatesView() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search templates..."
-            className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="Search for a template..."
+            className="w-full max-w-sm rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
       )}
 
-      {/* Template list */}
+      {/* Template table */}
       {loading ? (
         <div className="py-12 text-center text-sm text-gray-400">
           Loading templates...
@@ -161,200 +255,174 @@ export default function TemplatesView() {
           No templates match your search.
         </div>
       ) : (
-        <div className="flex flex-col divide-y divide-gray-200 rounded-lg border border-gray-200">
-          {filteredTemplates.map((template) => (
-            <div
-              key={template.id}
-              onClick={() => setViewingTemplate(template)}
-              className="relative flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-gray-50"
-            >
-              {/* Left: name + description */}
-              <div className="min-w-0 flex-1 pr-4">
-                <h3 className="truncate text-sm font-semibold text-gray-900">
-                  {template.name}
-                </h3>
-                {template.description && (
-                  <p className="mt-0.5 truncate text-xs text-gray-500">
-                    {template.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Right: date + badge + menu */}
-              <div className="flex shrink-0 items-center gap-3">
-                <span className="text-xs text-gray-400">
-                  {formatDate(template.updatedAt)}
-                </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    template.isSystem
-                      ? "bg-primary/10 text-primary"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-white">
+          <table className="w-full">
+            <thead className="sticky top-0 bg-white">
+              <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
+                <th className="py-3 pl-4 pr-4 font-medium">Template name</th>
+                <th className="py-3 pr-4 font-medium">Last edited</th>
+                <th className="py-3 pr-4 font-medium">Created By</th>
+                <th className="py-3 pr-4 font-medium w-36">
+                  <span className="sr-only">Actions</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filteredTemplates.map((template) => (
+                <tr
+                  key={template.id}
+                  onClick={() => setEditingTemplate(template)}
+                  className="cursor-pointer transition-colors hover:bg-gray-50"
                 >
-                  {template.isSystem ? "Adwene Default" : "Custom"}
-                </span>
-                {!template.isSystem && (
-                  <div className="relative">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMenuOpenId(
-                          menuOpenId === template.id ? null : template.id,
-                        );
-                      }}
-                      className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  <td className="py-3 pl-4 pr-4">
+                    <span className="text-sm font-normal text-gray-900">
+                      {template.name}
+                    </span>
+                    {template.description && (
+                      <span className="ml-2 text-xs text-gray-400">
+                        {template.description}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 pr-4 text-sm text-gray-500">
+                    {formatDate(template.updatedAt)}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        template.isSystem
+                          ? "bg-primary/10 text-primary"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
                     >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
-                    {menuOpenId === template.id && (
-                      <div className="absolute right-0 mt-1 w-32 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10">
+                      {template.isSystem ? "KasaMD" : "Custom"}
+                    </span>
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingTemplate(template);
+                        }}
+                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        title={template.isSystem ? "View" : "Edit"}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          await db.toggleTemplateFavourite(template.id, !template.isFavourite);
+                          await loadTemplates();
+                        }}
+                        className={`rounded p-1 hover:bg-gray-100 ${
+                          template.isFavourite ? "text-yellow-500" : "text-gray-400 hover:text-gray-600"
+                        }`}
+                        title={template.isFavourite ? "Unfavourite" : "Favourite"}
+                      >
+                        <Star className="h-4 w-4" fill={template.isFavourite ? "currentColor" : "none"} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleExport(template);
+                        }}
+                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        title="Export"
+                      >
+                        <Upload className="h-4 w-4" />
+                      </button>
+                      <div className="relative" data-menu-container>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setMenuOpenId(null);
-                            handleDelete(template);
+                            setMenuOpenId(
+                              menuOpenId === template.id ? null : template.id,
+                            );
                           }}
-                          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                          title="More"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                          Delete
+                          <MoreHorizontal className="h-4 w-4" />
                         </button>
+                        {menuOpenId === template.id && (
+                          <div className="absolute right-0 mt-1 w-36 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-10">
+                            {!template.isSystem && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMenuOpenId(null);
+                                  setEditingTemplate(template);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuOpenId(null);
+                                handleDuplicate(template);
+                              }}
+                              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                              Duplicate
+                            </button>
+                            {!template.isSystem && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMenuOpenId(null);
+                                  setDeletingTemplate(template);
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* View template modal */}
-      {viewingTemplate && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setViewingTemplate(null)}
-        >
-          <div
-            className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-xl bg-white shadow-2xl font-fakt"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal header */}
-            <div className="flex items-start justify-between border-b border-gray-200 px-6 pt-6 pb-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {viewingTemplate.name}
-                  </h2>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                      viewingTemplate.isSystem
-                        ? "bg-primary/10 text-primary"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {viewingTemplate.isSystem ? "Adwene Default" : "Custom"}
-                  </span>
-                </div>
-                {viewingTemplate.description && (
-                  <p className="mt-1 text-sm text-gray-500">
-                    {viewingTemplate.description}
-                  </p>
-                )}
-              </div>
-              <button
-                onClick={() => setViewingTemplate(null)}
-                className="ml-4 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Template content */}
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              <TemplateEditor
-                initialState={viewingTemplate.content as SerializedEditorState}
-                readOnly
-              />
-            </div>
-
-            {/* Modal footer */}
-            <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
-              <span className="text-xs text-gray-400">
-                Updated {formatDate(viewingTemplate.updatedAt)}
-              </span>
-              <button
-                onClick={() => setViewingTemplate(null)}
-                className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* Edit/view template modal */}
+      {editingTemplate && (
+        <TemplateModal
+          template={editingTemplate}
+          readOnly={editingTemplate.isSystem}
+          onSave={handleEditSave}
+          onClose={() => setEditingTemplate(null)}
+        />
       )}
 
       {/* Create template modal */}
-      <Modal
-        open={showCreate}
-        onClose={() => setShowCreate(false)}
-        title="Create Template"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Name
-            </label>
-            <input
-              type="text"
-              value={createName}
-              onChange={(e) => setCreateName(e.target.value)}
-              placeholder="e.g. Follow-Up Visit"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
+      {showCreate && (
+        <TemplateModal
+          onSave={handleCreateSave}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Description (optional)
-            </label>
-            <input
-              type="text"
-              value={createDescription}
-              onChange={(e) => setCreateDescription(e.target.value)}
-              placeholder="Brief description of this template"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Content
-            </label>
-            <TemplateEditor
-              initialState={null}
-              onChange={setCreateContent}
-            />
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={() => setShowCreate(false)}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={!createName.trim() || !createContent || creating}
-              className="rounded-lg bg-button px-4 py-1.5 text-sm font-medium text-white hover:bg-button-hover transition-colors disabled:opacity-50"
-            >
-              {creating ? "Creating..." : "Create Template"}
-            </button>
-          </div>
-        </div>
-      </Modal>
+      {/* Delete confirmation modal */}
+      <ConfirmModal
+        open={!!deletingTemplate}
+        onClose={() => setDeletingTemplate(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Template"
+        message={`Are you sure you want to delete "${deletingTemplate?.name}"? This action cannot be undone.`}
+      />
     </div>
   );
 }

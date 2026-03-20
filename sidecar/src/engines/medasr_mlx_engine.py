@@ -13,7 +13,7 @@ from tokenizers import Tokenizer
 from .. import config
 from .base import ASREngine
 
-logger = logging.getLogger("adwene-sidecar")
+logger = logging.getLogger("kasamd-sidecar")
 
 SAMPLE_RATE = 16_000  # Hz — must match the frontend capture pipeline
 _MIN_SAMPLES = 2_240  # ~140ms at 16 kHz — minimum for model conv layers

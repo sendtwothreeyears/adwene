@@ -1,3 +1,4 @@
+mod auth;
 mod sidecar;
 
 use sidecar::SidecarState;
@@ -37,6 +38,48 @@ pub fn run() {
             sql: include_str!("../migrations/005_add_raw_transcript.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "create_attachment_table",
+            sql: include_str!("../migrations/006_create_attachment.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 7,
+            description: "add_is_favourite_to_template",
+            sql: include_str!("../migrations/007_add_is_favourite_to_template.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 8,
+            description: "add_provider_onboarding_columns",
+            sql: include_str!("../migrations/008_provider_onboarding_columns.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 9,
+            description: "add_default_template_to_provider",
+            sql: include_str!("../migrations/009_add_default_template.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 10,
+            description: "add_signature_to_provider",
+            sql: include_str!("../migrations/010_add_signature.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 11,
+            description: "add_title_to_session",
+            sql: include_str!("../migrations/011_add_title_to_session.sql"),
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 12,
+            description: "create_tags_tables",
+            sql: include_str!("../migrations/012_create_tags.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     let app = tauri::Builder::default()
@@ -51,7 +94,13 @@ pub fn run() {
                 .add_migrations("sqlite:adwene.db", migrations)
                 .build(),
         )
+        .invoke_handler(tauri::generate_handler![
+            auth::hash_password,
+            auth::verify_password,
+        ])
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .build(tauri::generate_context!())
         .expect("error building tauri application");
 

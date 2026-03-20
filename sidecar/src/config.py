@@ -1,4 +1,4 @@
-"""Configuration constants for the Adwene sidecar."""
+"""Configuration constants for the KasaMD sidecar."""
 
 import os
 

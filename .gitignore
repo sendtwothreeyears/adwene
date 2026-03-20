@@ -1,6 +1,7 @@
 # Claude Code
 CLAUDE.md
 .claude/
+.lattice/
 _web
 tasks
 
@@ -39,4 +40,7 @@ dist/
 *.db
 *.log
 
+fluid/
 models/
+.archive/
+agents.md

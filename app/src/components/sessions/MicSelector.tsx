@@ -51,9 +51,9 @@ export default function MicSelector({
     return (
       <button
         onClick={onRequestPermission}
-        className="flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+        className="flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
       >
-        <Mic className="h-3.5 w-3.5" />
+        <Mic className="h-4 w-4" />
         Allow Microphone
       </button>
     );
@@ -76,11 +76,11 @@ export default function MicSelector({
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
+        className="flex items-center gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-50"
       >
-        <Mic className="h-3.5 w-3.5" />
+        <Mic className="h-4 w-4" />
         <span className="max-w-[120px] truncate">{displayLabel}</span>
-        <ChevronDown className="h-3 w-3" />
+        <ChevronDown className="h-3.5 w-3.5" />
       </button>
 
       {open && (

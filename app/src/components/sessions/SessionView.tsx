@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAppStore } from "../../stores/appStore";
 import * as db from "../../lib/db";
-import type { Patient } from "../../types";
+import type { Patient, Template } from "../../types";
 import type { SerializedEditorState } from "lexical";
 import SessionTopBar from "./SessionTopBar";
 import SessionTabBar, { type SessionTab } from "./SessionTabBar";
@@ -15,7 +15,14 @@ import { useRecordingTimer } from "../../hooks/useRecordingTimer";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useNoteGeneration } from "../../hooks/useNoteGeneration";
 import { useSidecar } from "../../contexts/SidecarContext";
+import { useTextExtraction } from "../../hooks/useTextExtraction";
 import { markdownToLexical } from "../../lib/markdown-to-lexical";
+import ContextAttachments, { type AttachmentWithStatus } from "./ContextAttachments";
+import QuickPatientModal from "../patients/QuickPatientModal";
+import Toast from "../ui/Toast";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { copyFile, mkdir, remove, stat } from "@tauri-apps/plugin-fs";
+import { appDataDir } from "@tauri-apps/api/path";
 
 /** Extract plain text from a serialized Lexical editor state. */
 function extractTextFromLexical(state: SerializedEditorState): string {
@@ -53,13 +60,15 @@ const TAB_PLACEHOLDER: Record<SessionTab, string> = {
 };
 
 const SAVE_DEBOUNCE_MS = 800;
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const WARN_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const STREAM_DEBOUNCE_MS = 200;
 
 export default function SessionView() {
   const activeSession = useAppStore((s) => s.activeSession);
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const mergeActiveSession = useAppStore((s) => s.mergeActiveSession);
-  const setView = useAppStore((s) => s.setView);
+  const providerId = useAppStore((s) => s.providerId);
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<SessionTab>("context");
@@ -67,6 +76,13 @@ export default function SessionView() {
   const [streamPreview, setStreamPreview] = useState<SerializedEditorState | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentWithStatus[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [showQuickPatient, setShowQuickPatient] = useState(false);
+  const [toast, setToast] = useState<{ message: string; variant: "success" | "error"; visible: boolean }>({ message: "", variant: "success", visible: false });
 
   const {
     devices,
@@ -114,7 +130,8 @@ export default function SessionView() {
     onNoteGenerated,
   } = useNoteGeneration();
 
-  const { connectionState } = useSidecar();
+  const { connectionState, send, onMessage } = useSidecar();
+  const { extractText } = useTextExtraction();
   const sidecarConnected = connectionState === "connected";
 
   const handleSelectDevice = useCallback(
@@ -149,6 +166,169 @@ export default function SessionView() {
     }
     db.getPatient(activeSession.patientId).then(setPatient).catch(() => setPatient(null));
   }, [activeSession?.patientId]);
+
+  // Load patients list for the picker
+  useEffect(() => {
+    if (!providerId) return;
+    db.listPatients(providerId).then(setPatients).catch(() => setPatients([]));
+  }, [providerId]);
+
+  const handlePatientChange = useCallback(async (selectedPatient: Patient) => {
+    if (!activeSession) return;
+    try {
+      await db.updateSession(activeSession.id, { patientId: selectedPatient.id });
+      mergeActiveSession(activeSession.id, { patientId: selectedPatient.id });
+      setToast({ message: `Session linked to ${selectedPatient.firstName} ${selectedPatient.lastName}`, variant: "success", visible: true });
+    } catch {
+      setToast({ message: "Failed to link patient", variant: "error", visible: true });
+    }
+  }, [activeSession, mergeActiveSession]);
+
+  const handlePatientCreated = useCallback((newPatient: Patient) => {
+    setPatients((prev) => [...prev, newPatient].sort((a, b) => a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName)));
+    handlePatientChange(newPatient);
+  }, [handlePatientChange]);
+
+  const getSelectedTemplateText = useCallback(() => {
+    if (!selectedTemplateId) return "";
+    const tmpl = templates.find((t) => t.id === selectedTemplateId);
+    if (!tmpl?.content) return "";
+    try {
+      return extractTextFromLexical(tmpl.content as SerializedEditorState);
+    } catch {
+      return "";
+    }
+  }, [selectedTemplateId, templates]);
+
+  /** Gather all context sources into a single string for note generation. */
+  const getContextText = useCallback(() => {
+    const parts: string[] = [];
+
+    // Patient context (from patient record)
+    if (patient?.context) {
+      parts.push(`Patient context:\n${patient.context}`);
+    }
+
+    // Session typed context (from Lexical editor)
+    if (activeSession?.context) {
+      try {
+        const text = extractTextFromLexical(activeSession.context as SerializedEditorState);
+        if (text.trim()) {
+          parts.push(`Session notes:\n${text}`);
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
+    // Attachment extracted texts
+    for (const att of attachments) {
+      if (att.extractedText?.trim()) {
+        parts.push(`Attached file (${att.fileName}):\n${att.extractedText}`);
+      }
+    }
+
+    const combined = parts.join("\n\n");
+    // Truncate to ~4000 chars to stay within token budget
+    return combined.length > 4000 ? combined.slice(0, 4000) + "\n[context truncated]" : combined;
+  }, [patient, activeSession, attachments]);
+
+  // Load templates for note generation selector
+  useEffect(() => {
+    if (!providerId) return;
+    db.listTemplates(providerId).then((list) => {
+      setTemplates(list);
+      // Auto-select first template if none selected
+      if (!selectedTemplateId && list.length > 0) {
+        setSelectedTemplateId(list[0].id);
+      }
+    }).catch(() => setTemplates([]));
+  }, [providerId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load attachments when session changes
+  useEffect(() => {
+    if (!activeSession?.id) {
+      setAttachments([]);
+      return;
+    }
+    db.listAttachments(activeSession.id)
+      .then((list) => setAttachments(list))
+      .catch(() => setAttachments([]));
+  }, [activeSession?.id]);
+
+  const handleAttach = useCallback(async () => {
+    if (!activeSession) return;
+    if (!sidecarConnected) {
+      setError("Sidecar not connected — cannot extract file text. Start the sidecar and try again.");
+      return;
+    }
+    const selected = await openDialog({
+      multiple: true,
+      filters: [{ name: "Documents", extensions: ["pdf", "txt", "csv", "md"] }],
+    });
+    if (!selected) return;
+
+    const paths = Array.isArray(selected) ? selected : [selected];
+    const dataDir = await appDataDir();
+    const attachDir = `${dataDir.endsWith("/") ? dataDir : dataDir + "/"}attachments/${activeSession.id}`;
+    await mkdir(attachDir, { recursive: true });
+
+    for (const filePath of paths) {
+      const fileName = filePath.split("/").pop() ?? "file";
+      const destPath = `${attachDir}/${crypto.randomUUID()}_${fileName}`;
+
+      try {
+        await copyFile(filePath, destPath);
+
+        const fileStat = await stat(destPath);
+        const fileSize = fileStat.size;
+        const ext = fileName.split(".").pop()?.toLowerCase() ?? "";
+        const mimeType = ext === "pdf" ? "application/pdf" : "text/plain";
+
+        const att = await db.createAttachment({
+          sessionId: activeSession.id,
+          fileName,
+          fileSize,
+          mimeType,
+          extractedText: null,
+          filePath: destPath,
+        });
+
+        // Show as extracting
+        setAttachments((prev) => [...prev, { ...att, _extracting: true }]);
+
+        // Extract text via sidecar
+        try {
+          const text = await extractText(destPath);
+          await db.updateAttachmentText(att.id, text);
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === att.id ? { ...a, extractedText: text, _extracting: false } : a
+            )
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : "Extraction failed";
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === att.id ? { ...a, _extracting: false, _error: errMsg } : a
+            )
+          );
+        }
+      } catch (err) {
+        console.error("Failed to attach file:", err);
+      }
+    }
+  }, [activeSession, extractText, sidecarConnected]);
+
+  const handleRemoveAttachment = useCallback(async (id: string) => {
+    const att = attachments.find((a) => a.id === id);
+    if (!att) return;
+    try {
+      await db.deleteAttachment(id);
+      try { await remove(att.filePath); } catch { /* file may not exist */ }
+      setAttachments((prev) => prev.filter((a) => a.id !== id));
+    } catch (err) {
+      console.error("Failed to remove attachment:", err);
+    }
+  }, [attachments]);
 
   // Throttled streaming preview: convert markdown → Lexical at a fixed interval
   // while streaming. Uses a ref so the interval always reads the latest text
@@ -217,21 +397,34 @@ export default function SessionView() {
 
   const handleStopRecording = useCallback(async () => {
     stopTimer();
+    const textPromise = stopTranscription(); // must come before stop() to keep isTranscribing=true
     await stop();
-    const text = await stopTranscription();
+    const text = await textPromise;
     if (text && activeSession) {
       try {
         const lexicalState = markdownToLexical(text);
         await db.updateSession(activeSession.id, { rawTranscript: text, transcript: lexicalState });
         mergeActiveSession(activeSession.id, { rawTranscript: text, transcript: lexicalState });
-        if (!activeSession.notes) {
-          generateNote(activeSession.id, text, "");
-        }
+
+        // Fire-and-forget title generation
+        const sid = activeSession.id;
+        send(JSON.stringify({ type: "generate_title", session_id: sid, transcript: text }));
+        const unsub = onMessage((raw: string) => {
+          try {
+            const data = JSON.parse(raw);
+            if (data.type === "title" && data.session_id === sid) {
+              unsub();
+              const title = data.title as string;
+              db.updateSession(sid, { title }).catch((e) => console.error("Failed to save title:", e));
+              mergeActiveSession(sid, { title });
+            }
+          } catch { /* ignore parse errors */ }
+        });
       } catch (err) {
         console.error("Failed to save rawTranscript:", err);
       }
     }
-  }, [stop, stopTranscription, activeSession, mergeActiveSession, generateNote]);
+  }, [stop, stopTranscription, activeSession, mergeActiveSession, send, onMessage]);
 
   const handleEditorChange = useCallback(
     (state: SerializedEditorState) => {
@@ -267,7 +460,6 @@ export default function SessionView() {
     try {
       await db.deleteSession(activeSession.id);
       setActiveSession(null);
-      setView("recent-sessions");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete session");
     }
@@ -285,8 +477,114 @@ export default function SessionView() {
     (activeTab === "transcription" && !hasCompletedTranscript) ||
     (activeTab === "note" && isStreaming);
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    if (activeTab !== "context") return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, [activeTab]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only hide overlay when leaving the container (not child elements)
+    if (e.currentTarget === e.target || !e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    if (activeTab !== "context" || !activeSession) return;
+    if (!sidecarConnected) {
+      setError("Sidecar not connected — cannot extract file text. Start the sidecar and try again.");
+      return;
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    const validExts = [".pdf", ".txt", ".csv", ".md"];
+    const validFiles = files.filter((f) =>
+      validExts.some((ext) => f.name.toLowerCase().endsWith(ext))
+    );
+
+    if (validFiles.length === 0) {
+      setError("Only PDF and text files (.pdf, .txt, .csv, .md) are supported.");
+      return;
+    }
+
+    // File size validation
+    const oversized = validFiles.filter((f) => f.size > MAX_FILE_SIZE);
+    if (oversized.length > 0) {
+      setError(`File too large (max 50MB): ${oversized.map((f) => f.name).join(", ")}`);
+      return;
+    }
+    const large = validFiles.filter((f) => f.size > WARN_FILE_SIZE);
+    if (large.length > 0) {
+      console.warn("Large files detected:", large.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`));
+    }
+
+    // For Tauri drag-drop, the files have a path property
+    // But standard HTML5 drag-drop doesn't give us the path
+    // Tauri provides file paths via the dataTransfer
+    const dataDir = await appDataDir();
+    const attachDir = `${dataDir.endsWith("/") ? dataDir : dataDir + "/"}attachments/${activeSession.id}`;
+    await mkdir(attachDir, { recursive: true });
+
+    for (const file of validFiles) {
+      // In Tauri, dropped files have a path accessible via webkitRelativePath or the file itself
+      // We need to read the file content and write it to appData
+      const destPath = `${attachDir}/${crypto.randomUUID()}_${file.name}`;
+      const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const mimeType = ext === "pdf" ? "application/pdf" : "text/plain";
+
+      try {
+        // Read file as ArrayBuffer and write to dest
+        const buffer = await file.arrayBuffer();
+        const { writeFile } = await import("@tauri-apps/plugin-fs");
+        await writeFile(destPath, new Uint8Array(buffer));
+
+        const att = await db.createAttachment({
+          sessionId: activeSession.id,
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType,
+          extractedText: null,
+          filePath: destPath,
+        });
+
+        setAttachments((prev) => [...prev, { ...att, _extracting: true }]);
+
+        try {
+          const text = await extractText(destPath);
+          await db.updateAttachmentText(att.id, text);
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === att.id ? { ...a, extractedText: text, _extracting: false } : a
+            )
+          );
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : "Extraction failed";
+          setAttachments((prev) =>
+            prev.map((a) =>
+              a.id === att.id ? { ...a, _extracting: false, _error: errMsg } : a
+            )
+          );
+        }
+      } catch (err) {
+        console.error("Failed to handle dropped file:", err);
+      }
+    }
+  }, [activeTab, activeSession, extractText, sidecarConnected]);
+
   return (
-    <div className="flex h-full flex-col">
+    <div
+      className="flex h-full flex-col relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {error && (
         <div className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">
           {error}
@@ -313,7 +611,9 @@ export default function SessionView() {
 
       <SessionTopBar
         session={activeSession}
-        patient={patient}
+        patients={patients}
+        onPatientChange={handlePatientChange}
+        onCreatePatient={() => setShowQuickPatient(true)}
         isRecording={captureState === "recording"}
         isTranscribing={isTranscribing}
         sidecarConnected={sidecarConnected}
@@ -347,7 +647,7 @@ export default function SessionView() {
       )}
 
       <div className="min-h-0 flex-1 pt-2">
-        {activeTab === "transcription" && isLiveTranscribing ? (
+        {activeTab === "transcription" && (isLiveTranscribing || finalTranscript || (liveTranscript && !activeSession.rawTranscript)) ? (
           <TranscriptPanel
             rawTranscript={activeSession.rawTranscript}
             liveTranscript={liveTranscript}
@@ -372,7 +672,7 @@ export default function SessionView() {
                         type="button"
                         onClick={() => {
                           setConfirmRegenerate(false);
-                          generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
+                          generateNote(activeSession.id, activeSession.rawTranscript ?? "", getSelectedTemplateText(), getContextText());
                         }}
                         className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                       >
@@ -392,6 +692,9 @@ export default function SessionView() {
                       hasNote={!!activeSession.notes}
                       isGenerating={isGenerating}
                       canGenerate={!!activeSession.rawTranscript}
+                      templates={templates}
+                      selectedTemplateId={selectedTemplateId}
+                      onTemplateChange={setSelectedTemplateId}
                       onCopy={() => {
                         const notes = activeSession.notes as SerializedEditorState | null;
                         if (!notes) return;
@@ -406,7 +709,7 @@ export default function SessionView() {
                         if (activeSession.notes) {
                           setConfirmRegenerate(true);
                         } else {
-                          generateNote(activeSession.id, activeSession.rawTranscript ?? "", "");
+                          generateNote(activeSession.id, activeSession.rawTranscript ?? "", getSelectedTemplateText(), getContextText());
                         }
                       }}
                     />
@@ -416,6 +719,44 @@ export default function SessionView() {
           />
         )}
       </div>
+
+      {/* Attachments toolbar — shown at bottom of context tab */}
+      {activeTab === "context" && (
+        <ContextAttachments
+          attachments={attachments}
+          onAttach={handleAttach}
+          onRemove={handleRemoveAttachment}
+        />
+      )}
+
+      {/* Drop zone overlay */}
+      {isDragOver && activeTab === "context" && (
+        <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center rounded-lg border-2 border-dashed border-primary/50 bg-primary/5">
+          <div className="rounded-lg bg-white px-6 py-4 shadow-lg">
+            <p className="text-sm font-medium text-gray-700">
+              Drop PDF or text files here
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Quick patient creation modal */}
+      {providerId && (
+        <QuickPatientModal
+          open={showQuickPatient}
+          onClose={() => setShowQuickPatient(false)}
+          providerId={providerId}
+          onCreated={handlePatientCreated}
+        />
+      )}
+
+      {/* Toast notification */}
+      <Toast
+        message={toast.message}
+        visible={toast.visible}
+        variant={toast.variant}
+        onDismiss={() => setToast((t) => ({ ...t, visible: false }))}
+      />
     </div>
   );
 }

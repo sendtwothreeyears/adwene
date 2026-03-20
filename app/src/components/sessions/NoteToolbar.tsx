@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import type { Template } from "../../types";
+import TemplateSelectorModal from "../templates/TemplateSelectorModal";
 
 interface NoteToolbarProps {
   hasNote: boolean;
@@ -6,6 +8,9 @@ interface NoteToolbarProps {
   onCopy: () => void;
   onRegenerate: () => void;
   canGenerate: boolean;
+  templates: Template[];
+  selectedTemplateId: string | null;
+  onTemplateChange: (id: string) => void;
 }
 
 export default function NoteToolbar({
@@ -14,8 +19,12 @@ export default function NoteToolbar({
   onCopy,
   onRegenerate,
   canGenerate,
+  templates,
+  selectedTemplateId,
+  onTemplateChange,
 }: NoteToolbarProps) {
   const [isCopied, setIsCopied] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   const handleCopy = () => {
     onCopy();
@@ -23,10 +32,35 @@ export default function NoteToolbar({
     setTimeout(() => setIsCopied(false), 2000);
   };
 
+  const selected = templates.find((t) => t.id === selectedTemplateId);
+
   return (
     <div className="flex items-center justify-between px-4 pt-3 pb-1">
       <div className="flex items-center gap-1">
-        <TemplateSelector />
+        <button
+          type="button"
+          onClick={() => setShowTemplateModal(true)}
+          className="inline-flex min-w-[200px] items-center justify-between rounded-lg border border-border bg-white px-4 py-1.5 text-left transition-colors hover:border-gray-400"
+        >
+          <span className="mr-1 truncate text-sm text-gray-900">
+            {selected?.name ?? "Select template"}
+          </span>
+          <svg
+            className="h-5 w-5 shrink-0 text-gray-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        <TemplateSelectorModal
+          open={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          templates={templates}
+          selectedTemplateId={selectedTemplateId}
+          onSelect={(id) => { if (id) onTemplateChange(id); }}
+        />
         <OptionsMenu
           hasNote={hasNote}
           isGenerating={isGenerating}
@@ -56,52 +90,6 @@ export default function NoteToolbar({
           {isCopied ? "Copied" : "Copy"}
         </button>
       </div>
-    </div>
-  );
-}
-
-/** Hardcoded template selector — only "SOAP Note" for now. */
-function TemplateSelector() {
-  const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex min-w-[200px] items-center justify-between rounded-lg border border-border bg-white px-4 py-1.5 text-left transition-colors hover:border-gray-400"
-      >
-        <span className="mr-1 text-sm text-gray-900">SOAP Note</span>
-        <svg
-          className={`h-5 w-5 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-
-      {isOpen && (
-        <div className="absolute z-50 mt-1 min-w-[200px] rounded-md border border-border bg-white shadow-lg">
-          <button
-            type="button"
-            onClick={() => setIsOpen(false)}
-            className="w-full px-4 py-2.5 text-left text-sm text-gray-900 transition-colors hover:bg-gray-100"
-          >
-            SOAP Note
-          </button>
-        </div>
-      )}
     </div>
   );
 }

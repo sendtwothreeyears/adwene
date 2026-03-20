@@ -23,6 +23,11 @@ fn project_root() -> PathBuf {
 }
 
 pub fn start_sidecar(state: &SidecarState) {
+    // Kill any orphaned sidecar still holding the port from a previous run
+    let _ = Command::new("sh")
+        .args(["-c", "lsof -ti :8765 | xargs kill -9 2>/dev/null"])
+        .status();
+
     let root = project_root();
     let sidecar_dir = root.join("sidecar");
 

@@ -14,7 +14,7 @@ interface UseTranscriptionReturn {
 }
 
 export function useTranscription(): UseTranscriptionReturn {
-  const { send, sendBinary, onMessage } = useSidecar();
+  const { send, sendBinary, onMessage, connectionState } = useSidecar();
 
   const [segments, setSegments] = useState<string[]>([]);
   const [partialText, setPartialText] = useState<string | null>(null);
@@ -107,9 +107,13 @@ export function useTranscription(): UseTranscriptionReturn {
 
   const sendAudioChunk = useCallback(
     (chunk: Int16Array) => {
+      if (connectionState !== "connected") {
+        setError("Lost connection to transcription service — audio may be missing");
+        return;
+      }
       sendBinary(chunk);
     },
-    [sendBinary],
+    [sendBinary, connectionState],
   );
 
   const reset = useCallback(() => {

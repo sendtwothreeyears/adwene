@@ -46,10 +46,10 @@ class MockNoteEngine(NoteEngine):
     async def load(self) -> None:
         pass
 
-    async def generate(self, transcript: str, template: str) -> str:
+    async def generate(self, transcript: str, template: str, context: str = "") -> str:
         return f"Note for: {transcript[:50]}"
 
-    async def generate_stream(self, transcript: str, template: str) -> AsyncIterator[str]:
+    async def generate_stream(self, transcript: str, template: str, context: str = "") -> AsyncIterator[str]:
         text = await self.generate(transcript, template)
         yield text
 
@@ -153,7 +153,7 @@ class TestStreamingHandshake:
         assert "session_id" in msg["message"]
         await ws.close()
 
-    async def test_stop_without_audio_returns_error(self, ws_server):
+    async def test_stop_without_audio_returns_empty_final(self, ws_server):
         ws = await _connect(ws_server)
         await _recv_json(ws)  # status
         await ws.send(json.dumps({
@@ -165,8 +165,9 @@ class TestStreamingHandshake:
             "session_id": "test-1",
         }))
         msg = await _recv_json(ws)
-        assert msg["type"] == protocol.ERROR
-        assert "No audio" in msg["message"]
+        assert msg["type"] == protocol.TRANSCRIPT_FINAL
+        assert msg["text"] == ""
+        assert msg["is_final"] is True
         await ws.close()
 
 
@@ -460,6 +461,45 @@ class TestNoteGeneration:
         await ws.send(json.dumps({
             "type": protocol.GENERATE_NOTE,
             "session_id": "note-err",
+        }))
+
+        msg = await _recv_json(ws)
+        assert msg["type"] == protocol.ERROR
+        assert "transcript" in msg["message"]
+        await ws.close()
+
+
+class TestTitleGeneration:
+    """Title generation via WebSocket tests."""
+
+    async def test_generate_title_returns_title(self, ws_server):
+        ws = await _connect(ws_server)
+        await _recv_json(ws)  # status
+
+        await ws.send(json.dumps({
+            "type": protocol.GENERATE_TITLE,
+            "session_id": "title-1",
+            "transcript": "Patient presents with headache for three days.",
+        }))
+
+        msgs = await _drain_messages(ws, timeout=3.0)
+        types = [m["type"] for m in msgs]
+
+        assert protocol.TITLE in types
+        title_msg = next(m for m in msgs if m["type"] == protocol.TITLE)
+        assert title_msg["session_id"] == "title-1"
+        assert len(title_msg["title"]) > 0
+        # Title should be at most 5 words
+        assert len(title_msg["title"].split()) <= 5
+        await ws.close()
+
+    async def test_generate_title_without_transcript_returns_error(self, ws_server):
+        ws = await _connect(ws_server)
+        await _recv_json(ws)  # status
+
+        await ws.send(json.dumps({
+            "type": protocol.GENERATE_TITLE,
+            "session_id": "title-err",
         }))
 
         msg = await _recv_json(ws)

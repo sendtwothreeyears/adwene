@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import onnxruntime
 
-logger = logging.getLogger("adwene-sidecar")
+logger = logging.getLogger("kasamd-sidecar")
 
 # Silero VAD ONNX model constants
 _SAMPLE_RATE = 16_000

@@ -1,4 +1,4 @@
-"""WebSocket server for the Adwene sidecar — routes audio to ASR engine.
+"""WebSocket server for the KasaMD sidecar — routes audio to ASR engine.
 
 Supports two transcription modes:
 - **Streaming (live):** Audio chunks flow through Silero VAD. Each detected
@@ -18,13 +18,14 @@ import websockets
 
 from . import config, protocol
 from .engines.registry import create_asr_engine, create_note_engine
+from .text_extraction import extract_text
 from .vad import SileroVAD
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
 )
-logger = logging.getLogger("adwene-sidecar")
+logger = logging.getLogger("kasamd-sidecar")
 
 # Global engine instances — loaded once at startup.
 _asr_engine = None
@@ -243,9 +244,12 @@ async def handler(websocket):
                 sid = data.get("session_id", session_id)
                 sess = _sessions.pop(sid, None)
                 if sess is None or len(sess.full_audio) == 0:
+                    logger.warning("No audio data for session %s — sending empty transcript", sid)
                     await _send_json(websocket, {
-                        "type": protocol.ERROR,
-                        "message": f"No audio data for session {sid}",
+                        "type": protocol.TRANSCRIPT_FINAL,
+                        "session_id": sid,
+                        "text": "",
+                        "is_final": True,
                     })
                     continue
 
@@ -295,6 +299,7 @@ async def handler(websocket):
                 sid = data.get("session_id")
                 transcript = data.get("transcript", "")
                 template = data.get("template", "")
+                context = data.get("context", "")
 
                 if not sid or not transcript:
                     await _send_json(websocket, {
@@ -319,7 +324,7 @@ async def handler(websocket):
                 try:
                     full_text = ""
                     async for chunk in _note_engine.generate_stream(
-                        transcript, template
+                        transcript, template, context
                     ):
                         full_text += chunk
                         await _send_json(websocket, {
@@ -340,6 +345,73 @@ async def handler(websocket):
                     await _send_json(websocket, {
                         "type": protocol.ERROR,
                         "message": str(exc),
+                    })
+
+            elif msg_type == protocol.GENERATE_TITLE:
+                sid = data.get("session_id")
+                transcript = data.get("transcript", "")
+
+                if not sid or not transcript:
+                    await _send_json(websocket, {
+                        "type": protocol.ERROR,
+                        "message": "generate_title requires session_id and transcript",
+                    })
+                    continue
+
+                logger.info("Title generation started for session %s", sid)
+
+                if not _engines_ready.is_set():
+                    logger.info("Waiting for engines to finish loading…")
+                    await _engines_ready.wait()
+
+                try:
+                    title = await _note_engine.generate_title(transcript)
+                    # Strip whitespace and truncate to ~5 words
+                    title = " ".join(title.strip().split()[:5])
+                    await _send_json(websocket, {
+                        "type": protocol.TITLE,
+                        "session_id": sid,
+                        "title": title,
+                    })
+                    logger.info("Title generated for session %s: %s", sid, title)
+                except Exception as exc:
+                    logger.exception("Title generation failed for session %s", sid)
+                    await _send_json(websocket, {
+                        "type": protocol.ERROR,
+                        "message": str(exc),
+                    })
+
+            elif msg_type == protocol.EXTRACT_TEXT:
+                request_id = data.get("request_id", "")
+                file_path = data.get("file_path", "")
+
+                if not file_path:
+                    await _send_json(websocket, {
+                        "type": protocol.TEXT_EXTRACTED,
+                        "request_id": request_id,
+                        "text": "",
+                        "error": "file_path is required",
+                    })
+                    continue
+
+                try:
+                    loop = asyncio.get_running_loop()
+                    text = await loop.run_in_executor(
+                        None, extract_text, file_path
+                    )
+                    await _send_json(websocket, {
+                        "type": protocol.TEXT_EXTRACTED,
+                        "request_id": request_id,
+                        "text": text,
+                        "error": None,
+                    })
+                except Exception as exc:
+                    logger.exception("Text extraction failed for %s", file_path)
+                    await _send_json(websocket, {
+                        "type": protocol.TEXT_EXTRACTED,
+                        "request_id": request_id,
+                        "text": "",
+                        "error": str(exc),
                     })
 
             else:

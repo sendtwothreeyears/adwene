@@ -95,9 +95,9 @@ export default function RecordsView() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="flex h-full flex-col">
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900 font-gtsuper">Records</h1>
+        <h1 className="text-2xl font-bold text-gray-900 font-gtsuper">Records</h1>
         <button
           onClick={handleOpenCreate}
           className="inline-flex items-center gap-1.5 rounded-lg bg-button px-3 py-1.5 text-sm font-medium text-white hover:bg-button-hover transition-colors"
