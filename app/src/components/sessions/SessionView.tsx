@@ -236,14 +236,16 @@ export default function SessionView() {
     return combined.length > 4000 ? combined.slice(0, 4000) + "\n[context truncated]" : combined;
   }, [patient, activeSession, attachments]);
 
-  // Load templates for note generation selector
+  // Load templates for note generation selector, respecting provider's default
   useEffect(() => {
     if (!providerId) return;
-    db.listTemplates(providerId).then((list) => {
+    Promise.all([db.listTemplates(providerId), db.getProvider()]).then(([list, provider]) => {
       setTemplates(list);
-      // Auto-select first template if none selected
+      // Use provider's default template if set, otherwise fall back to first
       if (!selectedTemplateId && list.length > 0) {
-        setSelectedTemplateId(list[0].id);
+        const defaultId = provider?.defaultTemplateId;
+        const hasDefault = defaultId && list.some((t) => t.id === defaultId);
+        setSelectedTemplateId(hasDefault ? defaultId : list[0].id);
       }
     }).catch(() => setTemplates([]));
   }, [providerId]); // eslint-disable-line react-hooks/exhaustive-deps
