@@ -130,6 +130,14 @@ class MedGemmaEngine(NoteEngine):
         def _stream() -> None:
             from mlx_vlm import stream_generate
 
+            tokenizer = (
+                self._processor.tokenizer
+                if hasattr(self._processor, "tokenizer")
+                else self._processor
+            )
+            token_ids: list[int] = []
+            prev_text = ""
+
             for response in stream_generate(
                 self._model,
                 self._processor,
@@ -140,9 +148,22 @@ class MedGemmaEngine(NoteEngine):
                 repetition_context_size=config.MEDGEMMA_REPETITION_CONTEXT_SIZE,
                 top_p=config.MEDGEMMA_TOP_P,
             ):
-                text = response.text if hasattr(response, "text") else str(response)
-                if text:
-                    detector.feed(text)
+                token = response.token if hasattr(response, "token") else None
+                if token is None:
+                    continue
+                # token may be an mlx scalar — convert to int
+                tid = int(token)
+                token_ids.append(tid)
+
+                # Decode all tokens so far to get the full text
+                decoded = tokenizer.decode(token_ids, skip_special_tokens=True)
+                # Skip if decode produced a replacement character (incomplete UTF-8)
+                if "\ufffd" in decoded[len(prev_text):]:
+                    continue
+                chunk = decoded[len(prev_text):]
+                if chunk:
+                    prev_text = decoded
+                    detector.feed(chunk)
                     if detector.is_looping:
                         logger.warning(
                             "Repetition loop detected during streaming, "
@@ -150,7 +171,15 @@ class MedGemmaEngine(NoteEngine):
                             len(detector.clean_text),
                         )
                         break
-                    loop.call_soon_threadsafe(queue.put_nowait, text)
+                    loop.call_soon_threadsafe(queue.put_nowait, chunk)
+
+            # Final decode to catch any trailing text
+            if token_ids:
+                final = tokenizer.decode(token_ids, skip_special_tokens=True)
+                trailing = final[len(prev_text):]
+                if trailing:
+                    loop.call_soon_threadsafe(queue.put_nowait, trailing)
+
             loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel
 
         from ..server import _mlx_executor
