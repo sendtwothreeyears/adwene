@@ -547,3 +547,59 @@ class TestTitleGeneration:
         assert msg["type"] == protocol.ERROR
         assert "transcript" in msg["message"]
         await ws.close()
+
+
+class TestBatchTranscription:
+    """Batch transcription mode — audio-only, no live segments (KAS-291)."""
+
+    async def test_batch_mode_skips_live_segments(self, ws_server, _mock_engines):
+        """In batch mode, no transcript_segment or partial messages during recording."""
+        ws = await _connect(ws_server)
+        await _recv_json(ws)  # status
+
+        await ws.send(json.dumps({
+            "type": protocol.TRANSCRIBE_START,
+            "session_id": "batch-1",
+            "mode": "batch",
+        }))
+
+        # Send speech-like audio that would normally trigger VAD segments
+        for _ in range(10):
+            await ws.send(_speech_like(300))
+            await asyncio.sleep(0.02)
+
+        # Drain any messages — should be none (no segments in batch mode)
+        msgs = await _drain_messages(ws, timeout=1.0)
+        segment_msgs = [m for m in msgs if m.get("type") == protocol.TRANSCRIPT_SEGMENT]
+        partial_msgs = [m for m in msgs if m.get("type") == protocol.TRANSCRIPT_PARTIAL]
+
+        assert len(segment_msgs) == 0, f"Batch mode should not produce segments: {segment_msgs}"
+        assert len(partial_msgs) == 0, f"Batch mode should not produce partials: {partial_msgs}"
+        await ws.close()
+
+    async def test_batch_mode_returns_transcript_final_on_stop(self, ws_server, _mock_engines):
+        """Batch mode should return transcript_final on stop."""
+        ws = await _connect(ws_server)
+        await _recv_json(ws)  # status
+
+        await ws.send(json.dumps({
+            "type": protocol.TRANSCRIBE_START,
+            "session_id": "batch-2",
+            "mode": "batch",
+        }))
+
+        # Send minimal audio
+        await ws.send(_speech_like(100))
+        await asyncio.sleep(0.05)
+
+        await ws.send(json.dumps({
+            "type": protocol.TRANSCRIBE_STOP,
+            "session_id": "batch-2",
+        }))
+
+        msgs = await _drain_messages(ws, timeout=5.0)
+        types = [m["type"] for m in msgs]
+
+        # Should get a transcript_final (may be empty due to mock engine)
+        assert protocol.TRANSCRIPT_FINAL in types, f"Expected transcript_final, got: {types}"
+        await ws.close()

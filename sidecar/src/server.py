@@ -74,6 +74,7 @@ _PARTIAL_MAX_AUDIO_MS = 10_000  # 10 seconds
 class _StreamingSession:
     """Per-session state for live streaming transcription."""
 
+    mode: str = "live"  # "live" (VAD + segments) or "batch" (accumulate only)
     vad: SileroVAD = field(default_factory=SileroVAD)
     full_audio: bytearray = field(default_factory=bytearray)
     segment_texts: list[str] = field(default_factory=list)  # accumulated segment transcripts
@@ -114,6 +115,93 @@ async def _broadcast(payload: dict) -> None:
             closed.append(ws)
     for ws in closed:
         _clients.discard(ws)
+
+
+# ---------------------------------------------------------------------------
+# Batch transcription for audio-only mode (KAS-291)
+# ---------------------------------------------------------------------------
+
+async def _batch_transcribe(ws, session_id: str, audio_bytes: bytes) -> None:
+    """Transcribe full audio in one pass and send as transcript_final.
+
+    Used when transcription mode is "batch" — no live segments were produced.
+    Reuses the same chunked encoder + beam search decode as _retranscribe.
+    """
+    from .engines.medasr_mlx_engine import SAMPLE_RATE
+
+    try:
+        pcm = np.frombuffer(audio_bytes, dtype=np.int16)
+        audio_float = pcm.astype(np.float32) / 32768.0
+
+        if len(audio_float) < 2_240:
+            logger.warning("Batch transcribe: audio too short (%d samples)", len(audio_float))
+            await _send_json(ws, {
+                "type": protocol.TRANSCRIPT_FINAL,
+                "session_id": session_id,
+                "text": "",
+                "is_final": True,
+            })
+            return
+
+        loop = asyncio.get_running_loop()
+        engine = _asr_engine
+
+        # Chunked encoder pass (same as _retranscribe)
+        chunk_duration = 20.0
+        chunk_samples = int(chunk_duration * SAMPLE_RATE)
+        hop_length = 160
+        win_length = 400
+        n_total_frames = 1 + (len(audio_float) - win_length) // hop_length
+        frames_per_chunk = max(1, chunk_samples // hop_length)
+
+        logprob_parts: list[np.ndarray] = []
+        f_start = 0
+        t0 = time.perf_counter()
+
+        async with _mlx_lock:
+            while f_start < n_total_frames:
+                f_end = min(f_start + frames_per_chunk, n_total_frames)
+                audio_start = f_start * hop_length
+                audio_end = (f_end - 1) * hop_length + win_length
+                chunk_audio = audio_float[audio_start:audio_end]
+
+                logprobs = await loop.run_in_executor(
+                    _mlx_executor, engine._encode_chunk_sync, chunk_audio,
+                )
+                logprob_parts.append(logprobs)
+                f_start = f_end
+
+        all_logprobs = np.concatenate(logprob_parts, axis=0)
+        t_encode = time.perf_counter() - t0
+
+        t1 = time.perf_counter()
+        text, logit_score, lm_score = await loop.run_in_executor(
+            None, engine.decode_logprobs, all_logprobs, 100,
+        )
+        t_decode = time.perf_counter() - t1
+
+        logger.info(
+            "Batch transcribe for %s: encode=%.1fs, decode=%.1fs, "
+            "audio=%.1fs, frames=%d",
+            session_id, t_encode, t_decode,
+            len(audio_float) / SAMPLE_RATE, n_total_frames,
+        )
+
+        await _send_json(ws, {
+            "type": protocol.TRANSCRIPT_FINAL,
+            "session_id": session_id,
+            "text": text,
+            "is_final": True,
+        })
+
+    except Exception:
+        logger.exception("Batch transcribe failed for session %s", session_id)
+        await _send_json(ws, {
+            "type": protocol.TRANSCRIPT_FINAL,
+            "session_id": session_id,
+            "text": "",
+            "is_final": True,
+        })
 
 
 # ---------------------------------------------------------------------------
@@ -297,6 +385,11 @@ async def handler(websocket):
                     if len(sess.full_audio) > _MAX_FULL_AUDIO_BYTES:
                         excess = len(sess.full_audio) - _MAX_FULL_AUDIO_BYTES
                         del sess.full_audio[:excess]
+
+                    # Batch mode: just accumulate audio, skip all live processing
+                    if sess.mode == "batch":
+                        continue
+
                     sess.bytes_since_last_segment += len(message)
 
                     # Feed to VAD — returns completed utterances
@@ -408,8 +501,12 @@ async def handler(websocket):
                     logger.warning(
                         "Overwriting existing session for %s", session_id
                     )
-                _sessions[session_id] = _StreamingSession()
-                logger.info("Streaming transcription started for session %s", session_id)
+                mode = data.get("mode", "live")
+                _sessions[session_id] = _StreamingSession(mode=mode)
+                logger.info(
+                    "Transcription started for session %s (mode=%s)",
+                    session_id, mode,
+                )
 
             elif msg_type == protocol.TRANSCRIBE_STOP:
                 sid = data.get("session_id", session_id)
@@ -434,48 +531,52 @@ async def handler(websocket):
                     sess.partial_task = None
 
                 logger.info(
-                    "Transcription stop for session %s — %d bytes, %d segments",
-                    sid, len(sess.full_audio), sess.segment_counter,
+                    "Transcription stop for session %s — %d bytes, %d segments, mode=%s",
+                    sid, len(sess.full_audio), sess.segment_counter, sess.mode,
                 )
-
-                # Flush any in-progress VAD utterance
-                trailing = sess.vad.flush()
-                if trailing:
-                    await _transcribe_segment(websocket, sid, sess, trailing)
 
                 # Wait for engines if they're still loading
                 if not _engines_ready.is_set():
                     logger.info("Waiting for engines to finish loading…")
                     await _engines_ready.wait()
 
-                # Build final transcript from accumulated segments.
-                # Segments were already transcribed with beam search during
-                # streaming, so concatenation gives a fast initial result.
-                final_text = " ".join(sess.segment_texts)
-                sess.segment_texts.clear()
+                if sess.mode == "batch":
+                    # Batch mode: run full-audio transcription directly,
+                    # send result as transcript_final. No live segments exist.
+                    audio_snapshot = bytes(sess.full_audio)
+                    sess.full_audio.clear()
+                    await _batch_transcribe(websocket, sid, audio_snapshot)
+                else:
+                    # Live mode: flush VAD, concatenate segments, then
+                    # kick off async retranscription for higher quality.
+                    trailing = sess.vad.flush()
+                    if trailing:
+                        await _transcribe_segment(websocket, sid, sess, trailing)
 
-                await _send_json(websocket, {
-                    "type": protocol.TRANSCRIPT_FINAL,
-                    "session_id": sid,
-                    "text": final_text,
-                    "is_final": True,
-                })
+                    # Build final transcript from accumulated segments.
+                    final_text = " ".join(sess.segment_texts)
+                    sess.segment_texts.clear()
 
-                # Kick off async full-audio re-transcription for higher
-                # quality. Copy the audio buffer before clearing.
-                audio_snapshot = bytes(sess.full_audio)
-                sess.full_audio.clear()
+                    await _send_json(websocket, {
+                        "type": protocol.TRANSCRIPT_FINAL,
+                        "session_id": sid,
+                        "text": final_text,
+                        "is_final": True,
+                    })
 
-                if len(audio_snapshot) > 0:
-                    # Cancel any previous retranscription for this session.
-                    _retranscribe_cancel[sid] = True
-                    old_task = _retranscribe_tasks.pop(sid, None)
-                    if old_task and not old_task.done():
-                        old_task.cancel()
-                        try:
-                            await old_task
-                        except (asyncio.CancelledError, Exception):
-                            pass
+                    # Kick off async full-audio re-transcription for higher quality.
+                    audio_snapshot = bytes(sess.full_audio)
+                    sess.full_audio.clear()
+
+                    if len(audio_snapshot) > 0:
+                        _retranscribe_cancel[sid] = True
+                        old_task = _retranscribe_tasks.pop(sid, None)
+                        if old_task and not old_task.done():
+                            old_task.cancel()
+                            try:
+                                await old_task
+                            except (asyncio.CancelledError, Exception):
+                                pass
 
                     _retranscribe_cancel[sid] = False
                     task = asyncio.create_task(
