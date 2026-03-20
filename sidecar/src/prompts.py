@@ -28,7 +28,19 @@ Never mention that you are an AI or that the note is a template.
 If additional context is provided (e.g., patient history, allergies, prior diagnoses, lab results, \
 or uploaded documents), use it to inform and enrich the note where relevant. \
 The transcript remains the primary source — context supplements it. \
-Do not fabricate details not found in either the transcript or the provided context."""
+Do not fabricate details not found in either the transcript or the provided context.
+
+Entity Tagging:
+Tag clinical entities inline using double-brace syntax. Tag only the FIRST occurrence of each unique entity.
+
+- Medications: {{drug:medication name}} — e.g., "prescribed {{drug:metformin}} 500 mg twice daily"
+- Conditions/Diagnoses: {{condition:diagnosis name}} — e.g., "assessment consistent with {{condition:type 2 diabetes mellitus}}"
+
+Rules:
+- Only tag confirmed diagnoses and prescribed/current medications mentioned in the transcript.
+- Do NOT tag symptoms, procedures, lab tests, or vitals.
+- Do NOT tag the same entity more than once — only the first mention.
+- Preserve the exact clinical term from the transcript inside the tag."""
 
 TITLE_PROMPT = """\
 Summarize the chief complaint or main topic of this medical encounter in 5 words or fewer. \
