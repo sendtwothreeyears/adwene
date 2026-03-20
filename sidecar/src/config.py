@@ -38,6 +38,10 @@ HOTWORD_WEIGHT: float = float(os.getenv("HOTWORD_WEIGHT", "10.0"))
 # full-audio re-transcription of longer recordings after stop.
 MAX_AUDIO_BUFFER_MB: float = float(os.getenv("MAX_AUDIO_BUFFER_MB", "60"))
 
+# -- Transcript logging --
+TRANSCRIPT_LOG_ENABLED: bool = os.getenv("TRANSCRIPT_LOG_ENABLED", "true").lower() == "true"
+TRANSCRIPT_LOG_DIR: str = os.getenv("TRANSCRIPT_LOG_DIR", os.path.expanduser("~/.kasamd/transcript_logs"))
+
 # -- Hotwords --
 # Words/phrases boosted during beam search decoding to improve recognition
 # of commonly mis-transcribed terms (numbers, ages, vitals, etc.)

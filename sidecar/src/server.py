@@ -217,6 +217,24 @@ async def _retranscribe(
             session_id, gate.selected, gate.reason, gate.edit_ratio,
         )
 
+        # --- Log both versions ---
+        from .transcript_logger import log_transcripts
+
+        audio_duration_s = len(audio_float) / SAMPLE_RATE
+        log_transcripts(
+            session_id=session_id,
+            segment_text=segment_text,
+            full_audio_text=refined_text,
+            selected=gate.selected,
+            reason=gate.reason,
+            edit_ratio=gate.edit_ratio,
+            logit_score=logit_score,
+            lm_score=lm_score,
+            audio_duration_s=audio_duration_s,
+            encode_time_s=t_encode,
+            decode_time_s=t_decode,
+        )
+
         # --- Emit result ---
         await _send_json(ws, {
             "type": protocol.TRANSCRIPT_REFINED,
