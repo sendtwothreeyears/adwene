@@ -66,7 +66,7 @@ class TestRetranscribe:
             return np.zeros((n_frames, 512), dtype=np.float16)
 
         mock_engine._encode_chunk_sync = fake_encode
-        mock_engine.decode_logprobs = MagicMock(return_value="refined transcript text")
+        mock_engine.decode_logprobs = MagicMock(return_value=("refined transcript text", -123.4, -56.7))
 
         with patch.object(server, "_asr_engine", mock_engine):
             yield mock_engine
@@ -95,11 +95,13 @@ class TestRetranscribe:
         # Refining should come before refined
         assert types.index(protocol.TRANSCRIPT_REFINING) < types.index(protocol.TRANSCRIPT_REFINED)
 
-        # Refined message should contain the decoded text
+        # Refined message should contain the decoded text and scores
         refined = next(m for m in msgs if m["type"] == protocol.TRANSCRIPT_REFINED)
         assert refined["text"] == "refined transcript text"
         assert refined["session_id"] == "sess-1"
         assert refined["segment_text"] == "original text"
+        assert "logit_score" in refined
+        assert "lm_score" in refined
 
     @pytest.mark.asyncio
     async def test_calls_encoder_in_chunks(self, _setup_engine):

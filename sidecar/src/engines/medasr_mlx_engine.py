@@ -27,6 +27,7 @@ class MedASRMLXEngine(ASREngine):
         self._tokenizer = None
         self._mel_filters = None
         self._beam_decoder = None
+        self._beam_decoder_retranscribe = None  # separate decoder with tuned LM weight
 
     async def load(self) -> None:
         logger.info("Loading MedASR MLX model: %s", config.MEDASR_MLX_MODEL_ID)
@@ -56,8 +57,14 @@ class MedASRMLXEngine(ASREngine):
             sample_rate=SAMPLE_RATE,
         )
 
-        # Build beam search decoder with KenLM language model
+        # Build beam search decoders with KenLM language model.
+        # Streaming decoder uses default alpha (0.5) for low-latency decoding.
+        # Retranscription decoder uses higher alpha (0.6) for stronger LM
+        # influence — acceptable because it runs async after recording stops.
         self._beam_decoder = _build_beam_decoder(Path(model_path), self._tokenizer)
+        self._beam_decoder_retranscribe = _build_beam_decoder(
+            Path(model_path), self._tokenizer, alpha=0.6, beta=1.0,
+        )
 
         logger.info("Tokenizer loaded, mel filters ready")
 
@@ -156,22 +163,32 @@ class MedASRMLXEngine(ASREngine):
         self,
         logprobs_f16: np.ndarray,
         beam_width: int = 100,
-    ) -> str:
-        """Decode concatenated log-probabilities with beam search.
+    ) -> tuple[str, float, float]:
+        """Decode concatenated log-probabilities with the retranscription decoder.
 
-        Uses the same beam decoder as streaming but accepts pre-computed
-        log-probs (float16 or float32, shape ``(T, vocab_size)``).
+        Uses the dedicated retranscription beam decoder (alpha=0.6) and
+        ``decode_beams`` to extract per-beam scores.
+
+        Returns ``(text, logit_score, lm_score)`` for the best beam.
         """
-        if self._beam_decoder is None:
+        decoder = self._beam_decoder_retranscribe or self._beam_decoder
+        if decoder is None:
             raise RuntimeError("Beam decoder not available")
+
         logprobs_f32 = logprobs_f16.astype(np.float32)
-        result = self._beam_decoder.decode(
+        beams = decoder.decode_beams(
             logprobs_f32,
             beam_width=beam_width,
+            beam_prune_logp=-8.0,
             hotwords=config.HOTWORDS,
             hotword_weight=config.HOTWORD_WEIGHT,
         )
-        return _restore_text(result)
+
+        if not beams:
+            return ("", 0.0, 0.0)
+
+        best = beams[0]
+        return (_restore_text(best.text), best.logit_score, best.lm_score)
 
     async def unload(self) -> None:
         self._model = None
@@ -185,10 +202,17 @@ class MedASRMLXEngine(ASREngine):
 # Beam search decoder construction
 # ---------------------------------------------------------------------------
 
-def _build_beam_decoder(model_path: Path, tokenizer: Tokenizer):
+def _build_beam_decoder(
+    model_path: Path,
+    tokenizer: Tokenizer,
+    alpha: float = 0.5,
+    beta: float = 1.5,
+):
     """Build a pyctcdecode beam search decoder with KenLM language model.
 
-    Returns None if pyctcdecode is not installed (graceful degradation).
+    *alpha* and *beta* control language-model weight and length bonus
+    respectively.  They are set at construction time and cannot be changed
+    per-call.  Returns None if pyctcdecode is not installed.
     """
     try:
         from pyctcdecode import build_ctcdecoder
@@ -253,6 +277,8 @@ def _build_beam_decoder(model_path: Path, tokenizer: Tokenizer):
             labels=vocab,
             kenlm_model_path=kenlm_model_path,
             unigrams=unigrams,
+            alpha=alpha,
+            beta=beta,
         )
     except Exception as exc:
         logger.warning("Beam search decoder construction failed — using greedy decoding: %s", exc)

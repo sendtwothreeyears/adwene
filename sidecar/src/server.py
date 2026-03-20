@@ -192,7 +192,7 @@ async def _retranscribe(
         t_encode = time.perf_counter() - t0
 
         t1 = time.perf_counter()
-        refined_text = await loop.run_in_executor(
+        refined_text, logit_score, lm_score = await loop.run_in_executor(
             None,  # CPU-only decode, no need for MLX executor
             engine.decode_logprobs,
             all_logprobs,
@@ -202,9 +202,10 @@ async def _retranscribe(
 
         logger.info(
             "Retranscribe for %s: encode=%.1fs, decode=%.1fs, "
-            "audio=%.1fs, frames=%d",
+            "audio=%.1fs, frames=%d, logit_score=%.2f, lm_score=%.2f",
             session_id, t_encode, t_decode,
             len(audio_float) / SAMPLE_RATE, n_total_frames,
+            logit_score, lm_score,
         )
 
         # --- Emit result ---
@@ -213,6 +214,8 @@ async def _retranscribe(
             "session_id": session_id,
             "text": refined_text,
             "segment_text": segment_text,
+            "logit_score": logit_score,
+            "lm_score": lm_score,
         })
 
     except websockets.exceptions.ConnectionClosed:
