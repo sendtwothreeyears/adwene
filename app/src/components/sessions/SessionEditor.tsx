@@ -72,6 +72,24 @@ function LoadStatePlugin({
   return null;
 }
 
+/** Updates the editor state on every prop change during streaming.
+ *  The editor is read-only during streaming, so undo history is not a concern. */
+function StreamingStatePlugin({
+  editorState,
+}: {
+  editorState: SerializedEditorState | null;
+}) {
+  const [editor] = useLexicalComposerContext();
+
+  useEffect(() => {
+    if (!editorState) return;
+    const state = editor.parseEditorState(editorState);
+    editor.setEditorState(state);
+  }, [editor, editorState]);
+
+  return null;
+}
+
 interface SessionEditorProps {
   /** Existing Lexical editor state to load (null for empty editor). */
   initialState: SerializedEditorState | null;
@@ -83,6 +101,8 @@ interface SessionEditorProps {
   placeholder?: string;
   /** Optional header rendered inside the editor card, above the content area. */
   header?: React.ReactNode;
+  /** When true, update editor state on every prop change (for streaming preview). */
+  streaming?: boolean;
 }
 
 export default memo(function SessionEditor({
@@ -91,6 +111,7 @@ export default memo(function SessionEditor({
   readOnly = false,
   placeholder,
   header,
+  streaming = false,
 }: SessionEditorProps) {
   const initialConfig = {
     namespace: "SessionEditor",
@@ -141,7 +162,11 @@ export default memo(function SessionEditor({
         <ListPlugin />
         {!readOnly && <FloatingToolbarPlugin />}
         {onChange && <OnChangePlugin onChange={handleChange} />}
-        <LoadStatePlugin editorState={initialState} />
+        {streaming ? (
+          <StreamingStatePlugin editorState={initialState} />
+        ) : (
+          <LoadStatePlugin editorState={initialState} />
+        )}
       </div>
     </LexicalComposer>
   );

@@ -737,6 +737,7 @@ export default function SessionView() {
             initialState={initialState}
             onChange={isReadOnly ? undefined : handleEditorChange}
             readOnly={isReadOnly}
+            streaming={!!noteIsStreaming}
             placeholder={TAB_PLACEHOLDER[activeTab]}
             header={
               activeTab === "note"
