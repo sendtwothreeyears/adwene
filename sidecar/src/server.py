@@ -208,12 +208,24 @@ async def _retranscribe(
             logit_score, lm_score,
         )
 
+        # --- Quality gate ---
+        from .quality_gate import select_transcript
+
+        gate = select_transcript(segment_text, refined_text)
+        logger.info(
+            "Quality gate for %s: selected=%s, reason=%s, edit_ratio=%.3f",
+            session_id, gate.selected, gate.reason, gate.edit_ratio,
+        )
+
         # --- Emit result ---
         await _send_json(ws, {
             "type": protocol.TRANSCRIPT_REFINED,
             "session_id": session_id,
-            "text": refined_text,
+            "text": gate.text,
             "segment_text": segment_text,
+            "selected": gate.selected,
+            "reason": gate.reason,
+            "edit_ratio": gate.edit_ratio,
             "logit_score": logit_score,
             "lm_score": lm_score,
         })
