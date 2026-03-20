@@ -5,12 +5,15 @@ import StatusBadge from "../ui/StatusBadge";
 import RecordButton from "./RecordButton";
 import MicSelector from "./MicSelector";
 import Waveform from "./Waveform";
+import PatientPickerDropdown from "../patients/PatientPickerDropdown";
 
 type PermissionState = "prompt" | "granted" | "denied" | "unknown";
 
 interface SessionTopBarProps {
   session: Session;
-  patient: Patient | null;
+  patients: Patient[];
+  onPatientChange: (patient: Patient) => void;
+  onCreatePatient: () => void;
   isRecording: boolean;
   isTranscribing?: boolean;
   sidecarConnected: boolean;
@@ -31,7 +34,9 @@ interface SessionTopBarProps {
 
 export default function SessionTopBar({
   session,
-  patient,
+  patients,
+  onPatientChange,
+  onCreatePatient,
   isRecording,
   isTranscribing,
   sidecarConnected,
@@ -52,19 +57,17 @@ export default function SessionTopBar({
   const showMicRow = permissionState === "granted" || permissionState === "prompt" || permissionState === "unknown";
 
   return (
-    <div className="flex flex-col gap-2 pb-4">
+    <div className="flex flex-col">
       {/* Primary row: patient info + actions */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h1 className="text-lg font-semibold text-gray-900">
-            {patient
-              ? `${patient.firstName} ${patient.lastName}`
-              : "No patient linked"}
-          </h1>
-          <StatusBadge status={session.status} />
-        </div>
-
         <div className="flex items-center gap-2">
+          <PatientPickerDropdown
+            patients={patients}
+            selectedPatientId={session.patientId}
+            onSelect={onPatientChange}
+            onCreateNew={onCreatePatient}
+            placeholder="Add patient..."
+          />
           {confirmDelete ? (
             <>
               <span className="text-sm text-gray-500">Delete session?</span>
@@ -82,6 +85,19 @@ export default function SessionTopBar({
               </button>
             </>
           ) : (
+            <button
+              onClick={onDeleteRequest}
+              className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-500"
+              title="Delete session"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+          <StatusBadge status={session.status} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          {!confirmDelete && (
             <>
               {!sidecarConnected && !isRecording && (
                 <span className="text-xs text-red-500">Sidecar offline</span>
@@ -95,35 +111,55 @@ export default function SessionTopBar({
                 onStart={onStart}
                 onStop={onStop}
               />
-              <button
-                onClick={onDeleteRequest}
-                className="rounded p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500"
-                title="Delete session"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
             </>
           )}
         </div>
       </div>
 
-      {/* Secondary row: timer + mic selector + audio preview/level — right-aligned */}
-      {showMicRow && !confirmDelete && (
-        <div className="flex items-center justify-end gap-3">
-          {isRecording && (
-            <span className="flex items-center gap-1.5 text-xs font-medium tabular-nums text-gray-600">
-              <Timer className="h-3.5 w-3.5" />
-              {recordingTime}
-            </span>
+      {/* Secondary row: title left, mic/waveform right */}
+      {!confirmDelete && (
+        <div className="flex items-center justify-between">
+          {session.title ? (
+            <div className="flex items-center text-sm italic text-gray-400" style={{ marginTop: "-20px" }}>
+              <svg width="12" height="24" viewBox="0 0 12 24" className="shrink-0 text-gray-300" style={{ marginBottom: "8px" }}>
+                <path d="M1 0 L1 16 Q1 19 4 19 L12 19" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <div className="pl-1">{session.title}</div>
+            </div>
+          ) : (
+            <span />
           )}
-          <MicSelector
-            devices={devices}
-            selectedDeviceId={selectedDeviceId}
-            permissionState={permissionState}
-            onSelectDevice={onSelectDevice}
-            onRequestPermission={onRequestPermission}
-          />
-          {audioPreviewStream && <Waveform audioStream={audioPreviewStream} />}
+          {showMicRow && (
+          <div
+            className={`flex items-center justify-end gap-3 rounded-lg px-3 py-1.5 ${isRecording ? "bg-red-50" : ""}`}
+            style={{ width: 250 }}
+          >
+            {isRecording ? (
+              <>
+                <span className="flex shrink-0 items-center gap-1.5 text-xs font-medium tabular-nums text-gray-600">
+                  <Timer className="h-3.5 w-3.5" />
+                  {recordingTime}
+                </span>
+                {audioPreviewStream && (
+                  <div className="flex-1 min-w-0">
+                    <Waveform audioStream={audioPreviewStream} mode="rolling" />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <MicSelector
+                  devices={devices}
+                  selectedDeviceId={selectedDeviceId}
+                  permissionState={permissionState}
+                  onSelectDevice={onSelectDevice}
+                  onRequestPermission={onRequestPermission}
+                />
+                {audioPreviewStream && <Waveform audioStream={audioPreviewStream} mode="bars" />}
+              </>
+            )}
+          </div>
+          )}
         </div>
       )}
     </div>

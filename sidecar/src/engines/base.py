@@ -28,11 +28,11 @@ class NoteEngine(ABC):
         """Load the model into memory."""
 
     @abstractmethod
-    async def generate(self, transcript: str, template: str) -> str:
-        """Generate a clinical note from a transcript and template."""
+    async def generate(self, transcript: str, template: str, context: str = "") -> str:
+        """Generate a clinical note from a transcript, template, and context."""
 
     async def generate_stream(
-        self, transcript: str, template: str
+        self, transcript: str, template: str, context: str = ""
     ) -> AsyncIterator[str]:
         """Yield text chunks as they are generated.
 
@@ -40,8 +40,18 @@ class NoteEngine(ABC):
         result as a single chunk.  Subclasses should override for real
         token-by-token streaming.
         """
-        text = await self.generate(transcript, template)
+        text = await self.generate(transcript, template, context)
         yield text
+
+    async def generate_title(self, transcript: str) -> str:
+        """Generate a short (up to 5 word) session title from a transcript.
+
+        Default implementation calls generate() with the title prompt as
+        template. Subclasses may override for a more efficient implementation.
+        """
+        from ..prompts import TITLE_PROMPT
+
+        return await self.generate(transcript, TITLE_PROMPT)
 
     @abstractmethod
     async def unload(self) -> None:

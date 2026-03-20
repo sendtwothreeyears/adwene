@@ -10,6 +10,9 @@ import type {
   UpdateTemplateInput,
   CreateSessionInput,
   UpdateSessionInput,
+  Attachment,
+  CreateAttachmentInput,
+  Tag,
 } from "../types";
 
 const DB_NAME = "sqlite:adwene.db";
@@ -43,14 +46,16 @@ export async function createProvider(input: Omit<Provider, "createdAt" | "update
       city, state, country, zipCode, phone, faxNumber, officeAddress,
       specialty, organizationName, practiceName, npi, licenseNumber,
       licenseState, deaNumber, taxId, languages, yearsOfExperience,
-      boardCertifications, createdAt, updatedAt
+      boardCertifications, passwordHash, teamSize, orgRole, defaultTemplateId, signature,
+      createdAt, updatedAt
     ) VALUES (
       $1, $2, $3, $4, $5,
       $6, $7, $8,
       $9, $10, $11, $12, $13, $14, $15,
       $16, $17, $18, $19, $20,
       $21, $22, $23, $24, $25,
-      $26, $27, $28
+      $26, $27, $28, $29, $30, $31,
+      $32, $33
     )`,
     [
       input.id, input.email, input.firstName, input.lastName, input.providerType,
@@ -61,11 +66,44 @@ export async function createProvider(input: Omit<Provider, "createdAt" | "update
       input.npi, input.licenseNumber, input.licenseState,
       input.deaNumber, input.taxId, input.languages, input.yearsOfExperience,
       input.boardCertifications ? JSON.stringify(input.boardCertifications) : null,
+      input.passwordHash, input.teamSize, input.orgRole, input.defaultTemplateId ?? null,
+      input.signature ?? null,
       now, now,
     ]
   );
 
   return { ...input, createdAt: now, updatedAt: now };
+}
+
+export async function updateProvider(id: string, input: Partial<Omit<Provider, "id" | "createdAt" | "updatedAt">>): Promise<void> {
+  const db = await getDb();
+  const now = nowISO();
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined) {
+      if (key === "boardCertifications" && value !== null) {
+        fields.push(`${key} = $${idx}`);
+        values.push(JSON.stringify(value));
+      } else {
+        fields.push(`${key} = $${idx}`);
+        values.push(value);
+      }
+      idx++;
+    }
+  }
+
+  fields.push(`updatedAt = $${idx}`);
+  values.push(now);
+  idx++;
+  values.push(id);
+
+  await db.execute(
+    `UPDATE Provider SET ${fields.join(", ")} WHERE id = $${idx}`,
+    values
+  );
 }
 
 export async function getProvider(): Promise<Provider | null> {
@@ -168,7 +206,16 @@ export async function createTemplate(input: CreateTemplateInput): Promise<Templa
     ]
   );
 
-  return { ...input, id, createdAt: now, updatedAt: now };
+  return { ...input, id, isFavourite: false, createdAt: now, updatedAt: now };
+}
+
+function parseTemplateRow(t: Template): Template {
+  return {
+    ...t,
+    isSystem: Boolean(t.isSystem),
+    isFavourite: Boolean(t.isFavourite),
+    content: typeof t.content === "string" ? JSON.parse(t.content as unknown as string) : t.content,
+  };
 }
 
 export async function listTemplates(providerId: string): Promise<Template[]> {
@@ -177,23 +224,14 @@ export async function listTemplates(providerId: string): Promise<Template[]> {
     "SELECT * FROM Template WHERE providerId = $1 OR isSystem = 1 ORDER BY name ASC",
     [providerId]
   );
-  return rows.map((t) => ({
-    ...t,
-    isSystem: Boolean(t.isSystem),
-    content: typeof t.content === "string" ? JSON.parse(t.content as unknown as string) : t.content,
-  }));
+  return rows.map(parseTemplateRow);
 }
 
 export async function getTemplate(id: string): Promise<Template | null> {
   const db = await getDb();
   const rows = await db.select<Template[]>("SELECT * FROM Template WHERE id = $1", [id]);
   if (rows.length === 0) return null;
-  const t = rows[0];
-  return {
-    ...t,
-    isSystem: Boolean(t.isSystem),
-    content: typeof t.content === "string" ? JSON.parse(t.content as unknown as string) : t.content,
-  };
+  return parseTemplateRow(rows[0]);
 }
 
 export async function updateTemplate(id: string, input: UpdateTemplateInput): Promise<void> {
@@ -208,8 +246,8 @@ export async function updateTemplate(id: string, input: UpdateTemplateInput): Pr
       if (key === "content") {
         fields.push(`content = $${idx}`);
         values.push(JSON.stringify(value));
-      } else if (key === "isSystem") {
-        fields.push(`isSystem = $${idx}`);
+      } else if (key === "isSystem" || key === "isFavourite") {
+        fields.push(`${key} = $${idx}`);
         values.push(value ? 1 : 0);
       } else {
         fields.push(`${key} = $${idx}`);
@@ -230,6 +268,15 @@ export async function updateTemplate(id: string, input: UpdateTemplateInput): Pr
   );
 }
 
+export async function toggleTemplateFavourite(id: string, isFavourite: boolean): Promise<void> {
+  const db = await getDb();
+  const now = nowISO();
+  await db.execute(
+    "UPDATE Template SET isFavourite = $1, updatedAt = $2 WHERE id = $3",
+    [isFavourite ? 1 : 0, now, id]
+  );
+}
+
 export async function deleteTemplate(id: string): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM Template WHERE id = $1", [id]);
@@ -246,11 +293,12 @@ export async function createSession(input: CreateSessionInput): Promise<Session>
 
   await db.execute(
     `INSERT INTO Session (
-      id, transcript, rawTranscript, notes, summary, context, status, preview,
+      id, title, transcript, rawTranscript, notes, summary, context, status, preview,
       providerId, patientId, templateId, createdAt, updatedAt
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
     [
       id,
+      input.title ?? null,
       input.transcript ? JSON.stringify(input.transcript) : null,
       input.rawTranscript ?? null,
       input.notes ? JSON.stringify(input.notes) : null,
@@ -318,7 +366,141 @@ export async function updateSession(id: string, input: UpdateSessionInput): Prom
 
 export async function deleteSession(id: string): Promise<void> {
   const db = await getDb();
+  // Cascade: delete attachments first (files cleaned by caller if needed)
+  await db.execute("DELETE FROM Attachment WHERE sessionId = $1", [id]);
   await db.execute("DELETE FROM Session WHERE id = $1", [id]);
+}
+
+// =============================================================================
+// Attachment
+// =============================================================================
+
+export async function createAttachment(input: CreateAttachmentInput): Promise<Attachment> {
+  const db = await getDb();
+  const id = crypto.randomUUID();
+  const now = nowISO();
+
+  await db.execute(
+    `INSERT INTO Attachment (
+      id, sessionId, fileName, fileSize, mimeType, extractedText, filePath, createdAt, updatedAt
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [
+      id, input.sessionId, input.fileName, input.fileSize,
+      input.mimeType, input.extractedText, input.filePath, now, now,
+    ]
+  );
+
+  return { ...input, id, createdAt: now, updatedAt: now };
+}
+
+export async function listAttachments(sessionId: string): Promise<Attachment[]> {
+  const db = await getDb();
+  return db.select<Attachment[]>(
+    "SELECT * FROM Attachment WHERE sessionId = $1 ORDER BY createdAt ASC",
+    [sessionId]
+  );
+}
+
+export async function getAttachment(id: string): Promise<Attachment | null> {
+  const db = await getDb();
+  const rows = await db.select<Attachment[]>("SELECT * FROM Attachment WHERE id = $1", [id]);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+export async function updateAttachmentText(id: string, extractedText: string): Promise<void> {
+  const db = await getDb();
+  const now = nowISO();
+  await db.execute(
+    "UPDATE Attachment SET extractedText = $1, updatedAt = $2 WHERE id = $3",
+    [extractedText, now, id]
+  );
+}
+
+export async function deleteAttachment(id: string): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM Attachment WHERE id = $1", [id]);
+}
+
+export async function deleteAttachmentsBySession(sessionId: string): Promise<Attachment[]> {
+  const db = await getDb();
+  const attachments = await listAttachments(sessionId);
+  await db.execute("DELETE FROM Attachment WHERE sessionId = $1", [sessionId]);
+  return attachments; // Return so caller can clean up files from disk
+}
+
+// =============================================================================
+// Tag
+// =============================================================================
+
+export async function getAllTags(): Promise<Tag[]> {
+  const db = await getDb();
+  return db.select<Tag[]>("SELECT * FROM Tag ORDER BY name ASC");
+}
+
+export async function searchTags(query: string): Promise<Tag[]> {
+  const db = await getDb();
+  return db.select<Tag[]>(
+    "SELECT * FROM Tag WHERE name LIKE $1 ORDER BY name ASC",
+    [`%${query.toLowerCase()}%`]
+  );
+}
+
+export async function getTagsForTemplate(templateId: string): Promise<Tag[]> {
+  const db = await getDb();
+  return db.select<Tag[]>(
+    `SELECT t.* FROM Tag t
+     INNER JOIN TemplateTag tt ON tt.tagId = t.id
+     WHERE tt.templateId = $1
+     ORDER BY t.name ASC`,
+    [templateId]
+  );
+}
+
+export async function addTagsToTemplate(templateId: string, tagNames: string[]): Promise<Tag[]> {
+  const db = await getDb();
+  const tags: Tag[] = [];
+
+  for (const raw of tagNames) {
+    const name = raw.trim().toLowerCase();
+    if (!name) continue;
+
+    // Upsert the tag
+    const existing = await db.select<Tag[]>("SELECT * FROM Tag WHERE name = $1", [name]);
+    let tag: Tag;
+    if (existing.length > 0) {
+      tag = existing[0];
+    } else {
+      const id = crypto.randomUUID();
+      await db.execute("INSERT INTO Tag (id, name) VALUES ($1, $2)", [id, name]);
+      tag = { id, name };
+    }
+
+    // Insert junction row (ignore if already exists)
+    await db.execute(
+      "INSERT OR IGNORE INTO TemplateTag (templateId, tagId) VALUES ($1, $2)",
+      [templateId, tag.id]
+    );
+    tags.push(tag);
+  }
+
+  return tags;
+}
+
+export async function removeTagFromTemplate(templateId: string, tagId: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "DELETE FROM TemplateTag WHERE templateId = $1 AND tagId = $2",
+    [templateId, tagId]
+  );
+}
+
+export async function setTagsForTemplate(templateId: string, tagNames: string[]): Promise<Tag[]> {
+  const db = await getDb();
+  // Clear existing tags for this template
+  await db.execute("DELETE FROM TemplateTag WHERE templateId = $1", [templateId]);
+  // Add the new set
+  if (tagNames.length === 0) return [];
+  return addTagsToTemplate(templateId, tagNames);
 }
 
 // --- Helpers ---

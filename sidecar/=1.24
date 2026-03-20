@@ -1,0 +1,9 @@
+Resolved 7 packages in 205ms
+Downloading onnxruntime (16.5MiB)
+ Downloaded onnxruntime
+Prepared 2 packages in 465ms
+Installed 4 packages in 129ms
+ + flatbuffers==25.12.19
+ + mpmath==1.3.0
+ + onnxruntime==1.24.3
+ + sympy==1.14.0

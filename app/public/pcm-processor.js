@@ -2,12 +2,12 @@
  * PCM Processor Worklet
  *
  * Resamples microphone audio from the native sample rate (typically 48kHz)
- * to 16kHz, buffers into 500ms chunks (8000 samples), converts to Int16 PCM,
+ * to 16kHz, buffers into 100ms chunks (1600 samples), converts to Int16 PCM,
  * and posts each chunk to the main thread.
  */
 
 const TARGET_SAMPLE_RATE = 16_000;
-const CHUNK_SAMPLES = 8_000; // 500ms at 16kHz
+const CHUNK_SAMPLES = 1_600; // 100ms at 16kHz (reduced from 200ms for faster partial streaming)
 
 class PcmProcessor extends AudioWorkletProcessor {
   constructor() {

@@ -186,6 +186,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Display fonts render too thin with antialiased smoothing — use default (subpixel) */
+.font-gtsuper, .font-ddn {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
+}
+
 /* Clinical entity highlights */
 .clinical-entity {
   border-radius: 3px;
@@ -199,6 +205,25 @@ body {
 .clinical-entity-condition {
   background-color: #fef3c7;
   color: #92400e;
+}
+
+/* Shake animation for wrong password */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* Slide-up animation for toast notifications */
+@keyframes slide-up {
+  0% { opacity: 0; transform: translate(-50%, 16px); }
+  100% { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.25s ease-out;
 }
 
 /* Scrollbar hiding */

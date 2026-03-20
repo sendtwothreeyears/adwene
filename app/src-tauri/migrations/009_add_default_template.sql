@@ -1,0 +1,1 @@
+ALTER TABLE Provider ADD COLUMN defaultTemplateId TEXT REFERENCES Template(id) ON DELETE SET NULL;

@@ -12,7 +12,8 @@ interface UseAudioCaptureOptions {
 interface UseAudioCaptureReturn {
   state: CaptureState;
   error: string | null;
-  chunks: Int16Array[];
+  /** Number of PCM chunks received (read from ref — does not trigger re-renders). */
+  chunkCount: () => number;
   sampleRate: number | null;
   start: () => Promise<void>;
   stop: () => Promise<void>;
@@ -29,7 +30,7 @@ export function useAudioCapture(
 
   const [state, setState] = useState<CaptureState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [chunks, setChunks] = useState<Int16Array[]>([]);
+  const chunkCountRef = useRef(0);
   const [sampleRate, setSampleRate] = useState<number | null>(null);
 
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -73,7 +74,7 @@ export function useAudioCapture(
 
     try {
       setError(null);
-      setChunks([]);
+      chunkCountRef.current = 0;
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: buildAudioConstraints(deviceIdRef.current),
@@ -107,9 +108,8 @@ export function useAudioCapture(
       workletNode.port.onmessage = (event) => {
         if (event.data.type === "chunk") {
           const pcm = event.data.pcm as Int16Array;
-          console.log(`[useAudioCapture] PCM chunk: ${pcm.length} samples`);
           onChunkRef.current?.(pcm);
-          setChunks((prev) => [...prev, pcm]);
+          chunkCountRef.current += 1;
         }
       };
 
@@ -179,12 +179,20 @@ export function useAudioCapture(
 
     // Flush remaining samples from the worklet
     return new Promise<void>((resolve) => {
+      let settled = false;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        node.port.removeEventListener("message", onFlushDone);
+        cleanup();
+        setState("idle");
+        resolve();
+      };
+
       const onFlushDone = (event: MessageEvent) => {
         if (event.data.type === "flush-done") {
-          node.port.removeEventListener("message", onFlushDone);
-          cleanup();
-          setState("idle");
-          resolve();
+          clearTimeout(timeoutId);
+          settle();
         }
       };
 
@@ -192,11 +200,7 @@ export function useAudioCapture(
       node.port.postMessage("flush");
 
       // Safety timeout — if flush-done never arrives, clean up anyway
-      setTimeout(() => {
-        cleanup();
-        setState("idle");
-        resolve();
-      }, 1000);
+      const timeoutId = setTimeout(settle, 1000);
     });
   }, [cleanup]);
 
@@ -210,7 +214,7 @@ export function useAudioCapture(
   return {
     state,
     error,
-    chunks,
+    chunkCount: () => chunkCountRef.current,
     sampleRate,
     start,
     stop,

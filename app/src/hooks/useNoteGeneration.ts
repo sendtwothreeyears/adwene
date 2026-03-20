@@ -6,7 +6,7 @@ interface UseNoteGenerationReturn {
   isStreaming: boolean;
   streamingText: string;
   error: string | null;
-  generateNote: (sessionId: string, transcript: string, template?: string) => void;
+  generateNote: (sessionId: string, transcript: string, template?: string, context?: string) => void;
   onNoteGenerated: (callback: (content: unknown) => void) => void;
 }
 
@@ -82,7 +82,7 @@ export function useNoteGeneration(): UseNoteGenerationReturn {
   }, [connectionState, isGenerating]);
 
   const generateNote = useCallback(
-    (sessionId: string, transcript: string, template?: string) => {
+    (sessionId: string, transcript: string, template?: string, context?: string) => {
       sessionIdRef.current = sessionId;
       setError(null);
       isGeneratingRef.current = true;
@@ -95,6 +95,7 @@ export function useNoteGeneration(): UseNoteGenerationReturn {
           session_id: sessionId,
           transcript,
           template: template ?? "",
+          context: context ?? "",
         }),
       );
     },

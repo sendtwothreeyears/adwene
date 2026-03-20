@@ -1,4 +1,4 @@
-"""Configuration constants for the Adwene sidecar."""
+"""Configuration constants for the KasaMD sidecar."""
 
 import os
 
@@ -26,16 +26,13 @@ HOTWORD_WEIGHT: float = float(os.getenv("HOTWORD_WEIGHT", "10.0"))
 # Words/phrases boosted during beam search decoding to improve recognition
 # of commonly mis-transcribed terms (numbers, ages, vitals, etc.)
 HOTWORDS: list[str] = [
-    # Numbers (spoken form)
+    # Numbers — the one category the medical LM is weak on, since spoken
+    # numbers ("sixty-eight") map to many possible digit forms.
     "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
     "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen",
     "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
     "hundred", "thousand",
-    # Age / vitals patterns
+    # Age / vitals units — also weakly covered by LM
     "year", "old", "male", "female",
-    "systolic", "diastolic", "pulse", "temperature", "respiratory", "oxygen", "saturation",
     "milligrams", "milliliters", "percent", "pounds", "kilograms",
-    # Common clinical terms that benefit from boosting
-    "patient", "history", "presents", "presenting", "complains", "complaints",
-    "diagnosis", "assessment", "bilateral", "unilateral",
 ]

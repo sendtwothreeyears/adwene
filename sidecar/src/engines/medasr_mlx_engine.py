@@ -13,7 +13,7 @@ from tokenizers import Tokenizer
 from .. import config
 from .base import ASREngine
 
-logger = logging.getLogger("adwene-sidecar")
+logger = logging.getLogger("kasamd-sidecar")
 
 SAMPLE_RATE = 16_000  # Hz — must match the frontend capture pipeline
 _MIN_SAMPLES = 2_240  # ~140ms at 16 kHz — minimum for model conv layers
@@ -72,7 +72,10 @@ class MedASRMLXEngine(ASREngine):
         audio_float = pcm_int16.astype(np.float32) / 32768.0
 
         loop = asyncio.get_running_loop()
-        text = await loop.run_in_executor(None, self._transcribe_sync, audio_float)
+        # Use the dedicated MLX executor to prevent concurrent Metal GPU calls.
+        # Imported here to avoid circular dependency at module level.
+        from ..server import _mlx_executor
+        text = await loop.run_in_executor(_mlx_executor, self._transcribe_sync, audio_float)
         return text
 
     def _transcribe_sync(self, audio: np.ndarray) -> str:

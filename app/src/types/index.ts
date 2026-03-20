@@ -1,5 +1,5 @@
 // =============================================================================
-// Adwene Offline — TypeScript Types
+// KasaMD Offline — TypeScript Types
 //
 // Mirrors the offline SQLite schema (docs/schema/schema.prisma).
 // Same field names, same types, same UUID format as the online KasaMD server.
@@ -85,6 +85,11 @@ export interface Provider {
   languages: string | null;
   yearsOfExperience: number | null;
   boardCertifications: unknown[] | null;
+  passwordHash: string | null;
+  teamSize: string | null;
+  orgRole: string | null;
+  defaultTemplateId: string | null;
+  signature: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -114,6 +119,7 @@ export interface Template {
   content: unknown;
   description: string | null;
   isSystem: boolean;
+  isFavourite: boolean;
   createdAt: string;
   updatedAt: string;
   providerId: string | null;
@@ -121,6 +127,7 @@ export interface Template {
 
 export interface Session {
   id: string;
+  title: string | null;
   transcript: unknown | null;
   rawTranscript: string | null;
   notes: unknown | null;
@@ -135,6 +142,23 @@ export interface Session {
   templateId: string | null;
 }
 
+export interface Attachment {
+  id: string;
+  sessionId: string;
+  fileName: string;
+  fileSize: number;
+  mimeType: string;
+  extractedText: string | null;
+  filePath: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+}
+
 // --- Input Types ---
 
 export type CreatePatientInput = Omit<Patient, "id" | "createdAt" | "updatedAt">;
@@ -143,11 +167,13 @@ export type UpdatePatientInput = Partial<
   Omit<Patient, "id" | "createdAt" | "updatedAt" | "providerId">
 >;
 
-export type CreateTemplateInput = Omit<Template, "id" | "createdAt" | "updatedAt">;
+export type CreateTemplateInput = Omit<Template, "id" | "isFavourite" | "createdAt" | "updatedAt">;
 
 export type UpdateTemplateInput = Partial<
   Omit<Template, "id" | "createdAt" | "updatedAt">
 >;
+
+export type CreateAttachmentInput = Omit<Attachment, "id" | "createdAt" | "updatedAt">;
 
 export type CreateSessionInput = Omit<Session, "id" | "createdAt" | "updatedAt">;
 

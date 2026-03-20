@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useAppStore } from "../../stores/appStore";
 import * as db from "../../lib/db";
 import type { Patient, Template } from "../../types";
 import Modal from "../ui/Modal";
-import SearchInput from "../ui/SearchInput";
-import TemplateSelector from "../templates/TemplateSelector";
+import TemplateSelectorModal from "../templates/TemplateSelectorModal";
+import PatientPickerDropdown from "../patients/PatientPickerDropdown";
+import QuickPatientModal from "../patients/QuickPatientModal";
 
 export default function CreateSessionModal() {
   const providerId = useAppStore((s) => s.providerId);
@@ -17,7 +18,8 @@ export default function CreateSessionModal() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [patientSearch, setPatientSearch] = useState("");
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showQuickPatient, setShowQuickPatient] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,25 +28,16 @@ export default function CreateSessionModal() {
     Promise.all([
       db.listPatients(providerId),
       db.listTemplates(providerId),
-    ]).then(([p, t]) => {
+      db.getProvider(),
+    ]).then(([p, t, provider]) => {
       setPatients(p);
       setTemplates(t);
+      setSelectedTemplateId(provider?.defaultTemplateId ?? null);
     });
     setSelectedPatientId(null);
     setSelectedTemplateId(null);
-    setPatientSearch("");
     setError(null);
   }, [showSessionForm, providerId]);
-
-  const filteredPatients = useMemo(() => {
-    if (!patientSearch.trim()) return patients;
-    const q = patientSearch.toLowerCase();
-    return patients.filter(
-      (p) =>
-        p.firstName.toLowerCase().includes(q) ||
-        p.lastName.toLowerCase().includes(q),
-    );
-  }, [patients, patientSearch]);
 
   async function handleCreate() {
     if (!providerId) return;
@@ -56,6 +49,7 @@ export default function CreateSessionModal() {
         providerId,
         patientId: selectedPatientId,
         templateId: selectedTemplateId,
+        title: null,
         transcript: null,
         rawTranscript: null,
         notes: null,
@@ -65,7 +59,7 @@ export default function CreateSessionModal() {
       });
       setActiveSession(session);
       closeSessionForm();
-      setView("current-session");
+      setView("session");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create session");
     } finally {
@@ -90,47 +84,35 @@ export default function CreateSessionModal() {
         <label className="mb-1 block text-sm font-medium text-gray-700">
           Patient (optional)
         </label>
-        <SearchInput
-          value={patientSearch}
-          onChange={setPatientSearch}
-          placeholder="Search patients..."
+        <PatientPickerDropdown
+          patients={patients}
+          selectedPatientId={selectedPatientId}
+          onSelect={(patient) => setSelectedPatientId(patient.id)}
+          onCreateNew={() => setShowQuickPatient(true)}
+          allowNone
+          onClearPatient={() => setSelectedPatientId(null)}
+          placeholder="Select patient..."
         />
-        <div className="mt-2 max-h-40 overflow-y-auto rounded-md border border-gray-200">
-          <button
-            onClick={() => setSelectedPatientId(null)}
-            className={`w-full px-3 py-2 text-left text-sm transition-colors ${
-              selectedPatientId === null
-                ? "bg-primary/10 font-medium text-primary"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            No patient
-          </button>
-          {filteredPatients.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setSelectedPatientId(p.id)}
-              className={`w-full px-3 py-2 text-left text-sm transition-colors ${
-                selectedPatientId === p.id
-                  ? "bg-primary/10 font-medium text-primary"
-                  : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {p.firstName} {p.lastName}
-            </button>
-          ))}
-          {filteredPatients.length === 0 && (
-            <p className="px-3 py-2 text-sm text-gray-400">No patients found</p>
-          )}
-        </div>
       </div>
 
       {/* Template selector */}
       <div className="mb-6">
-        <TemplateSelector
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Template (optional)
+        </label>
+        <button
+          type="button"
+          onClick={() => setShowTemplateModal(true)}
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-left text-sm transition-colors hover:border-gray-400 focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          {templates.find((t) => t.id === selectedTemplateId)?.name ?? "Select template..."}
+        </button>
+        <TemplateSelectorModal
+          open={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
           templates={templates}
           selectedTemplateId={selectedTemplateId}
-          onChange={setSelectedTemplateId}
+          onSelect={setSelectedTemplateId}
         />
       </div>
 
@@ -150,6 +132,23 @@ export default function CreateSessionModal() {
           {submitting ? "Creating..." : "Create Session"}
         </button>
       </div>
+
+      {/* Quick patient creation modal */}
+      {providerId && (
+        <QuickPatientModal
+          open={showQuickPatient}
+          onClose={() => setShowQuickPatient(false)}
+          providerId={providerId}
+          onCreated={(newPatient) => {
+            setPatients((prev) =>
+              [...prev, newPatient].sort((a, b) =>
+                a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName)
+              )
+            );
+            setSelectedPatientId(newPatient.id);
+          }}
+        />
+      )}
     </Modal>
   );
 }

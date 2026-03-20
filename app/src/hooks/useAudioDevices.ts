@@ -8,7 +8,7 @@ export interface AudioDevice {
 
 type PermissionState = "prompt" | "granted" | "denied" | "unknown";
 
-const STORAGE_KEY = "adwene:preferred-mic";
+const STORAGE_KEY = "kasamd:preferred-mic";
 
 export function useAudioDevices() {
   const [devices, setDevices] = useState<AudioDevice[]>([]);

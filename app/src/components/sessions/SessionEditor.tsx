@@ -10,6 +10,7 @@ import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
 import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin";
+import { ListPlugin } from "@lexical/react/LexicalListPlugin";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { ListNode, ListItemNode } from "@lexical/list";
 import { LinkNode } from "@lexical/link";
@@ -17,8 +18,37 @@ import { CodeNode } from "@lexical/code";
 import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { EditorState, SerializedEditorState } from "lexical";
 import { ClinicalEntityNode } from "../../lib/clinicalEntityNode";
+import FloatingToolbarPlugin from "../ui/FloatingToolbarPlugin";
 
 const EDITOR_NODES = [ListNode, ListItemNode, LinkNode, CodeNode, HeadingNode, QuoteNode, ClinicalEntityNode];
+
+const EDITOR_THEME = {
+  text: {
+    bold: "font-semibold",
+    italic: "italic",
+    underline: "underline",
+  },
+  list: {
+    ul: "list-disc ml-4",
+    ol: "list-decimal ml-4",
+    listitem: "my-0.5",
+    nested: {
+      listitem: "list-none",
+    },
+  },
+  paragraph: "my-1",
+  heading: {
+    h1: "text-2xl font-bold my-2",
+    h2: "text-xl font-semibold my-2",
+    h3: "text-lg font-semibold my-1",
+  },
+  quote: "border-l-4 border-gray-300 pl-4 italic text-gray-600 my-2",
+  // Alignment classes used by FORMAT_ELEMENT_COMMAND
+  formatLeft: "text-left",
+  formatCenter: "text-center",
+  formatRight: "text-right",
+  formatJustify: "text-justify",
+};
 
 /** Loads an existing Lexical editor state into the editor on mount. */
 function LoadStatePlugin({
@@ -60,6 +90,7 @@ export default memo(function SessionEditor({
   const initialConfig = {
     namespace: "SessionEditor",
     nodes: EDITOR_NODES,
+    theme: EDITOR_THEME,
     editable: !readOnly,
     onError: (error: Error) => {
       console.error("SessionEditor error:", error);
@@ -72,9 +103,9 @@ export default memo(function SessionEditor({
     }
   }
 
-  const editorClassName = "min-h-0 flex-1 overflow-auto px-4 py-3 text-sm text-gray-900 outline-none";
+  const editorClassName = "min-h-0 flex-1 overflow-auto px-4 py-3 text-base text-gray-900 outline-none";
   const placeholderEl = (
-    <div className="pointer-events-none absolute top-0 left-0 px-4 py-3 text-sm text-gray-400">
+    <div className="pointer-events-none absolute top-0 left-0 px-4 py-3 text-base text-gray-400">
       {placeholder}
     </div>
   );
@@ -82,11 +113,7 @@ export default memo(function SessionEditor({
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <div
-        className={`flex h-full flex-col rounded-md border border-border bg-white ${
-          readOnly
-            ? ""
-            : "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring"
-        }`}
+        className="flex h-full flex-col rounded-md border border-border bg-white"
       >
         {header}
         <div className="relative min-h-0 flex-1 flex flex-col">
@@ -106,6 +133,8 @@ export default memo(function SessionEditor({
           />
         </div>
         <HistoryPlugin />
+        <ListPlugin />
+        {!readOnly && <FloatingToolbarPlugin />}
         {onChange && <OnChangePlugin onChange={handleChange} />}
         <LoadStatePlugin editorState={initialState} />
       </div>

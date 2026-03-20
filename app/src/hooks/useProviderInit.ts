@@ -45,5 +45,13 @@ export function useProviderInit() {
     [setProviderId],
   );
 
-  return { loading, needsSetup, error, provider, createInitialProvider };
+  const refreshProvider = useCallback(async () => {
+    const p = await db.getProvider();
+    if (p) {
+      setProvider(p);
+      setProviderId(p.id);
+    }
+  }, [setProviderId]);
+
+  return { loading, needsSetup, error, provider, createInitialProvider, refreshProvider };
 }

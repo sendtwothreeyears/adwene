@@ -5,10 +5,10 @@ import logging
 from collections.abc import AsyncIterator
 
 from .. import config
-from ..prompts import SYSTEM_PROMPT
+from ..prompts import SYSTEM_PROMPT, TITLE_PROMPT
 from .base import NoteEngine
 
-logger = logging.getLogger("adwene-sidecar")
+logger = logging.getLogger("kasamd-sidecar")
 
 # Maximum time (seconds) for a single generate() call before we abort.
 GENERATE_TIMEOUT_S = 120
@@ -42,12 +42,14 @@ class GemmaEngine(NoteEngine):
             timeout=GENERATE_TIMEOUT_S,
         )
 
-    def _generate_sync(self, transcript: str, template: str) -> str:
+    def _generate_sync(self, transcript: str, template: str, context: str = "") -> str:
         from mlx_lm import generate
 
         system = SYSTEM_PROMPT
         if template:
             system += f"\n\nAdditional formatting instructions: {template}"
+        if context:
+            system += f"\n\nAdditional context:\n{context}"
 
         # Gemma has no system role — prepend instructions to the user message
         messages = [
@@ -66,7 +68,7 @@ class GemmaEngine(NoteEngine):
         )
 
     async def generate_stream(
-        self, transcript: str, template: str
+        self, transcript: str, template: str, context: str = ""
     ) -> AsyncIterator[str]:
         if self._model is None:
             raise RuntimeError("Gemma engine not loaded — call load() first")
@@ -76,6 +78,8 @@ class GemmaEngine(NoteEngine):
         system = SYSTEM_PROMPT
         if template:
             system += f"\n\nAdditional formatting instructions: {template}"
+        if context:
+            system += f"\n\nAdditional context:\n{context}"
 
         messages = [
             {"role": "user", "content": f"{system}\n\nTranscript:\n{transcript}"},
@@ -112,6 +116,34 @@ class GemmaEngine(NoteEngine):
                 yield chunk
         finally:
             await future
+
+    async def generate_title(self, transcript: str) -> str:
+        if self._model is None:
+            raise RuntimeError("Gemma engine not loaded — call load() first")
+
+        loop = asyncio.get_running_loop()
+        return await asyncio.wait_for(
+            loop.run_in_executor(None, self._generate_title_sync, transcript),
+            timeout=GENERATE_TIMEOUT_S,
+        )
+
+    def _generate_title_sync(self, transcript: str) -> str:
+        from mlx_lm import generate
+
+        messages = [
+            {"role": "user", "content": f"{TITLE_PROMPT}\n\nTranscript:\n{transcript}"},
+        ]
+
+        prompt = self._tokenizer.apply_chat_template(
+            messages, add_generation_prompt=True
+        )
+
+        return generate(
+            self._model,
+            self._tokenizer,
+            prompt=prompt,
+            max_tokens=32,
+        )
 
     async def unload(self) -> None:
         self._model = None

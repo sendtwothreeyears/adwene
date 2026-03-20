@@ -1,7 +1,7 @@
 [project]
-name = "adwene-sidecar"
+name = "kasamd-sidecar"
 version = "0.1.0"
-description = "Python sidecar for Adwene — MedASR and Gemma engine host"
+description = "Python sidecar for KasaMD — MedASR and Gemma engine host"
 requires-python = ">=3.10"
 dependencies = [
     "websockets>=12.0",
@@ -13,10 +13,21 @@ dependencies = [
     "camel-kenlm",
     "anthropic>=0.84.0",
     "google-genai>=1.67.0",
+    "onnxruntime>=1.24",
+    "pymupdf>=1.24",
 ]
 
 [tool.uv]
 prerelease = "allow"
 
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=0.23",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
 [project.scripts]
-adwene-sidecar = "sidecar.src.server:main"
+kasamd-sidecar = "sidecar.src.server:main"
