@@ -63,8 +63,10 @@ class MedGemmaEngine(NoteEngine):
 
         max_tokens = estimate_max_tokens(template) if template else config.MEDGEMMA_MAX_TOKENS
 
-        # EOS token IDs from model config — ensures generation stops at turn boundary
+        # Reset stopping criteria so generate() stops at EOS tokens
+        tokenizer = self._processor.tokenizer if hasattr(self._processor, "tokenizer") else self._processor
         eos_token_ids = getattr(self._model.config, "eos_token_id", [1, 106])
+        tokenizer.stopping_criteria.reset(eos_token_ids)
 
         result = generate(
             self._model,
@@ -76,7 +78,6 @@ class MedGemmaEngine(NoteEngine):
             repetition_penalty=config.MEDGEMMA_REPETITION_PENALTY,
             repetition_context_size=config.MEDGEMMA_REPETITION_CONTEXT_SIZE,
             top_p=config.MEDGEMMA_TOP_P,
-            eos_tokens=eos_token_ids,
         )
         mx.synchronize()  # Flush Metal command buffers before releasing executor
 
@@ -224,7 +225,9 @@ class MedGemmaEngine(NoteEngine):
 
         prompt = self._format_prompt(messages)
 
+        tokenizer = self._processor.tokenizer if hasattr(self._processor, "tokenizer") else self._processor
         eos_token_ids = getattr(self._model.config, "eos_token_id", [1, 106])
+        tokenizer.stopping_criteria.reset(eos_token_ids)
 
         result = generate(
             self._model,
@@ -234,7 +237,6 @@ class MedGemmaEngine(NoteEngine):
             verbose=False,
             temperature=config.MEDGEMMA_TEMPERATURE,
             top_p=config.MEDGEMMA_TOP_P,
-            eos_tokens=eos_token_ids,
         )
         mx.synchronize()  # Flush Metal command buffers before releasing executor
         return strip_model_artifacts(result.text)
