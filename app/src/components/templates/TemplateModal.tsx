@@ -181,9 +181,9 @@ export default function TemplateModal({
             </div>
 
             {/* Scrollable Lexical editor — fills remaining height */}
-            <div className="flex flex-1 flex-col overflow-auto px-6 py-4">
+            <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
               <TemplateEditor
-                className="flex flex-1 flex-col"
+                className=""
                 initialState={
                   (template?.content as SerializedEditorState) ?? null
                 }
