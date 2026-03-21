@@ -106,7 +106,7 @@ export default function SessionTopBar({
               <button
                 onClick={onAddNote}
                 disabled={!hasTranscript || isRecording || !!isTranscribing}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-dark px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary-dark px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary disabled:cursor-not-allowed disabled:opacity-30"
                 title={!hasTranscript ? "Record a transcript first" : "New note"}
               >
                 <FilePlus className="h-4 w-4" />
