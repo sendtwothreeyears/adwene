@@ -16,9 +16,11 @@ class TestSystemPromptStructure:
     def test_contains_heading_formatting_instruction(self):
         assert "markdown headings" in SYSTEM_PROMPT.lower() or "# " in SYSTEM_PROMPT
 
-    def test_contains_few_shot_example(self):
-        assert "# Subjective" in SYSTEM_PROMPT
-        assert "# Objective" in SYSTEM_PROMPT
+    def test_no_format_specific_bias(self):
+        """Prompt should not contain SOAP-specific section names that bias output."""
+        assert "# Subjective" not in SYSTEM_PROMPT
+        assert "# Objective" not in SYSTEM_PROMPT
+        assert "# Assessment" not in SYSTEM_PROMPT
 
     def test_no_entity_tagging_instructions(self):
         assert "{{drug:" not in SYSTEM_PROMPT
