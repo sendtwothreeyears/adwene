@@ -238,13 +238,68 @@ export default function TemplatesView() {
           <h2 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">Favourites</h2>
           <div className="flex flex-wrap gap-3">
             {favouriteTemplates.map((template) => (
-              <button
+              <div
                 key={template.id}
                 onClick={() => setEditingTemplate(template)}
-                className="flex h-24 w-24 flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-2 text-center shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                className="relative flex h-20 w-36 cursor-pointer flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
               >
-                <span className="line-clamp-3 text-[11px] font-medium leading-tight text-gray-700">{template.name}</span>
-              </button>
+                <span className="line-clamp-2 text-xs font-medium leading-tight text-gray-700">{template.name}</span>
+                <div className="flex justify-end">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenId(menuOpenId === `fav-${template.id}` ? null : `fav-${template.id}`);
+                    }}
+                    className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </div>
+                {menuOpenId === `fav-${template.id}` && (
+                  <div className="absolute right-0 top-full mt-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-20" data-menu-container>
+                    {!template.isSystem && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setMenuOpenId(null); setEditingTemplate(template); }}
+                        className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        Edit
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setMenuOpenId(null); handleDuplicate(template); }}
+                      className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Duplicate
+                    </button>
+                    <button
+                      onClick={async (e) => { e.stopPropagation(); setMenuOpenId(null); await db.toggleTemplateFavourite(template.id, false); await loadTemplates(); }}
+                      className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Remove from favourites
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setMenuOpenId(null);
+                        const provider = await db.getProvider();
+                        if (provider) { await db.updateProvider(provider.id, { defaultTemplateId: template.id }); }
+                      }}
+                      className="flex w-full items-center px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      Set as default template
+                    </button>
+                    <div className="my-1 border-t border-gray-100" />
+                    {!template.isSystem && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setMenuOpenId(null); setDeletingTemplate(template); }}
+                        className="flex w-full items-center px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         </div>
