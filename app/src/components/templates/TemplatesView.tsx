@@ -236,7 +236,7 @@ export default function TemplatesView() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search for a template..."
-            className="w-full max-w-sm rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full max-w-sm rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
       )}
