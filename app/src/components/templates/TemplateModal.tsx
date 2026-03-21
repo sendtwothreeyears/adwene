@@ -104,7 +104,7 @@ export default function TemplateModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative flex h-[90vh] w-[95vw] max-w-[1200px] flex-col rounded-xl bg-white shadow-2xl font-fakt">
+      <div className="relative flex max-h-[85vh] w-[90vw] max-w-[1100px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl font-fakt">
         {/* "Open instructions" button when sidebar is closed */}
         {!isHelperOpen && !readOnly && (
           <button
@@ -157,9 +157,9 @@ export default function TemplateModal({
         )}
 
         {/* Main content — split left/right */}
-        <div className="relative flex flex-1 overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {/* Left side — Editor */}
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
             {/* Title and description */}
             <div className="flex-shrink-0 border-b border-gray-100 px-6 pb-4 pt-6">
               <input
