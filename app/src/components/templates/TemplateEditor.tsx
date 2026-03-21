@@ -109,7 +109,7 @@ export default function TemplateEditor({
         <RichTextPlugin
           contentEditable={
             <ContentEditable
-              className="flex-1 min-h-[200px] text-base text-gray-900 outline-none font-fakt"
+              className="min-h-[200px] text-base text-gray-900 outline-none font-fakt"
               placeholder={<div className="pointer-events-none absolute top-0 left-0 text-sm text-gray-400">{placeholder}</div>}
             />
           }

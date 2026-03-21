@@ -104,7 +104,7 @@ export default function TemplateModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="relative flex max-h-[85vh] w-[90vw] max-w-[1100px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl font-fakt">
+      <div className="relative flex h-[85vh] w-[90vw] max-w-[1100px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl font-fakt">
         {/* "Open instructions" button when sidebar is closed */}
         {!isHelperOpen && !readOnly && (
           <button
@@ -181,9 +181,9 @@ export default function TemplateModal({
             </div>
 
             {/* Scrollable Lexical editor — fills remaining height */}
-            <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
               <TemplateEditor
-                className=""
+                className="overflow-hidden"
                 initialState={
                   (template?.content as SerializedEditorState) ?? null
                 }
