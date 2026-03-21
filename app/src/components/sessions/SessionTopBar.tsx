@@ -110,7 +110,7 @@ export default function SessionTopBar({
                 title={!hasTranscript ? "Record a transcript first" : "New note"}
               >
                 <FilePlus className="h-4 w-4" />
-                New Note
+                Create
               </button>
               {!sidecarConnected && !isRecording && (
                 <span className="text-xs text-red-500">Sidecar offline</span>

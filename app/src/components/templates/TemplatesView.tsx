@@ -243,8 +243,7 @@ export default function TemplatesView() {
                 onClick={() => setEditingTemplate(template)}
                 className="flex aspect-square flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-3 text-center shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
               >
-                <Star className="mb-2 h-5 w-5" fill="#eab308" stroke="#eab308" />
-                <span className="line-clamp-2 text-xs font-medium text-gray-700">{template.name}</span>
+                <span className="line-clamp-3 text-xs font-medium text-gray-700">{template.name}</span>
               </button>
             ))}
           </div>
