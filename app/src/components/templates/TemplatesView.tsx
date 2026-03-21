@@ -241,22 +241,22 @@ export default function TemplatesView() {
               <div
                 key={template.id}
                 onClick={() => setEditingTemplate(template)}
-                className="relative flex h-20 w-36 cursor-pointer flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                className="flex h-20 w-36 cursor-pointer flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
               >
                 <span className="line-clamp-2 text-xs font-medium leading-tight text-gray-700">{template.name}</span>
                 <div className="flex justify-end">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setMenuOpenId(menuOpenId === `fav-${template.id}` ? null : `fav-${template.id}`);
-                    }}
-                    className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </button>
-                </div>
-                {menuOpenId === `fav-${template.id}` && (
-                  <div className="absolute left-full bottom-0 ml-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-50" data-menu-container>
+                  <div className="relative" data-menu-container>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpenId(menuOpenId === `fav-${template.id}` ? null : `fav-${template.id}`);
+                      }}
+                      className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                    {menuOpenId === `fav-${template.id}` && (
+                      <div className="absolute left-full top-0 ml-2 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-50">
                     {!template.isSystem && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setMenuOpenId(null); setEditingTemplate(template); }}
@@ -297,8 +297,10 @@ export default function TemplatesView() {
                         Delete
                       </button>
                     )}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
