@@ -59,7 +59,7 @@ class MedGemmaEngine(NoteEngine):
 
         system = SYSTEM_PROMPT
         if template:
-            system += f"\n\nAdditional formatting instructions: {template}"
+            system += f"\n\nFormat the note using the following section structure:\n\n{template}"
         if context:
             system += f"\n\nAdditional context:\n{context}"
 
@@ -109,7 +109,7 @@ class MedGemmaEngine(NoteEngine):
 
         system = SYSTEM_PROMPT
         if template:
-            system += f"\n\nAdditional formatting instructions: {template}"
+            system += f"\n\nFormat the note using the following section structure:\n\n{template}"
         if context:
             system += f"\n\nAdditional context:\n{context}"
 
