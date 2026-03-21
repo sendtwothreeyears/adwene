@@ -737,7 +737,7 @@ export default function SessionView() {
   const hasCompletedTranscript = !!activeSession.rawTranscript && !isLiveTranscribing;
   const isReadOnly =
     (activeTab === "transcription" && !hasCompletedTranscript) ||
-    (getNoteId(activeTab) !== null && isStreaming);
+    (getNoteId(activeTab) !== null && (isStreaming || !hasCompletedTranscript));
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (activeTab !== "context") return;
@@ -1008,7 +1008,11 @@ export default function SessionView() {
             onChange={isReadOnly ? undefined : handleEditorChange}
             readOnly={isReadOnly}
             streaming={!!noteIsStreaming}
-            placeholder={getTabPlaceholder(activeTab)}
+            placeholder={
+              getNoteId(activeTab) !== null && !hasCompletedTranscript
+                ? "Create a transcription first to generate a note..."
+                : getTabPlaceholder(activeTab)
+            }
             header={
               getNoteId(activeTab) !== null
                 ? confirmRegenerate
