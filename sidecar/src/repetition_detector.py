@@ -11,11 +11,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-
-# -- Defaults (can be overridden per-instance) --------------------------------
-DEFAULT_NGRAM_SIZE = 5
-DEFAULT_MAX_OCCURRENCES = 4
-DEFAULT_WINDOW_WORDS = 250
+from . import config
 
 
 class RepetitionDetector:
@@ -33,13 +29,13 @@ class RepetitionDetector:
 
     def __init__(
         self,
-        ngram_size: int = DEFAULT_NGRAM_SIZE,
-        max_occurrences: int = DEFAULT_MAX_OCCURRENCES,
-        window_words: int = DEFAULT_WINDOW_WORDS,
+        ngram_size: int | None = None,
+        max_occurrences: int | None = None,
+        window_words: int | None = None,
     ) -> None:
-        self._ngram_size = ngram_size
-        self._max_occurrences = max_occurrences
-        self._window_words = window_words
+        self._ngram_size = ngram_size if ngram_size is not None else config.REPETITION_NGRAM_SIZE
+        self._max_occurrences = max_occurrences if max_occurrences is not None else config.REPETITION_MAX_OCCURRENCES
+        self._window_words = window_words if window_words is not None else config.REPETITION_WINDOW_WORDS
 
         self._text = ""
         self._is_looping = False

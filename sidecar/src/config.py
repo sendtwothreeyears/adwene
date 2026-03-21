@@ -27,6 +27,11 @@ MEDGEMMA_REPETITION_CONTEXT_SIZE: int = int(os.getenv("MEDGEMMA_REPETITION_CONTE
 MEDGEMMA_TOP_P: float = float(os.getenv("MEDGEMMA_TOP_P", "0.65"))
 MEDGEMMA_MAX_TOKENS: int = int(os.getenv("MEDGEMMA_MAX_TOKENS", "1500"))
 
+# -- Repetition detector parameters --
+REPETITION_NGRAM_SIZE: int = int(os.getenv("REPETITION_NGRAM_SIZE", "5"))
+REPETITION_MAX_OCCURRENCES: int = int(os.getenv("REPETITION_MAX_OCCURRENCES", "4"))
+REPETITION_WINDOW_WORDS: int = int(os.getenv("REPETITION_WINDOW_WORDS", "250"))
+
 # -- Decoding configuration --
 BEAM_WIDTH: int = int(os.getenv("BEAM_WIDTH", "8"))
 USE_LM: bool = os.getenv("USE_LM", "true").lower() == "true"
