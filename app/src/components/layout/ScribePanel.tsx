@@ -12,6 +12,10 @@ import {
 import { useAppStore } from "../../stores/appStore";
 import * as db from "../../lib/db";
 import type { Session, Patient } from "../../types";
+import ScribePanelSortPopover, {
+  type SortField,
+  type SortDirection,
+} from "./ScribePanelSortPopover";
 
 /** Group sessions by date label in MM/DD/YYYY format. */
 function getDateLabel(dateStr: string): string {
@@ -51,6 +55,9 @@ export default function ScribePanel() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [showSortPopover, setShowSortPopover] = useState(false);
 
   const selectionMode = selectedIds.size > 0;
 
@@ -101,12 +108,48 @@ export default function ScribePanel() {
     });
   }, [sessions, patients, search]);
 
-  // Group filtered sessions by date
+  // Sort filtered sessions
+  const sorted = useMemo(() => {
+    const list = [...filtered];
+    const dir = sortDirection === "asc" ? 1 : -1;
+
+    function sessionName(s: Session): string {
+      if (s.title) return s.title.toLowerCase();
+      if (s.patientId) {
+        const p = patients[s.patientId];
+        if (p) return `${p.firstName} ${p.lastName}`.toLowerCase();
+      }
+      return "";
+    }
+
+    list.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "createdAt":
+          cmp = a.createdAt.localeCompare(b.createdAt);
+          break;
+        case "updatedAt":
+          cmp = a.updatedAt.localeCompare(b.updatedAt);
+          break;
+        case "name":
+          cmp = sessionName(a).localeCompare(sessionName(b));
+          break;
+        case "status":
+          cmp = a.status.localeCompare(b.status);
+          break;
+      }
+      return cmp * dir;
+    });
+    return list;
+  }, [filtered, sortField, sortDirection, patients]);
+
+  // Group sorted sessions by date
   const grouped = useMemo(() => {
     const groups: { label: string; sessions: Session[] }[] = [];
     let currentLabel = "";
-    for (const session of filtered) {
-      const label = getDateLabel(session.createdAt);
+    const dateField = sortField === "updatedAt" ? "updatedAt" : "createdAt";
+    for (const session of sorted) {
+      const label = getDateLabel(session[dateField]);
       if (label !== currentLabel) {
         groups.push({ label, sessions: [session] });
         currentLabel = label;
@@ -115,7 +158,7 @@ export default function ScribePanel() {
       }
     }
     return groups;
-  }, [filtered]);
+  }, [sorted, sortField]);
 
   function getPatientName(session: Session): string | null {
     if (!session.patientId) return null;
@@ -195,12 +238,28 @@ export default function ScribePanel() {
         >
           <ListFilter className="h-4 w-4" />
         </button>
-        <button
-          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-          title="Sort"
-        >
-          <ArrowUpDown className="h-4 w-4" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowSortPopover((v) => !v)}
+            className={`rounded-md p-1.5 transition-colors ${
+              showSortPopover
+                ? "bg-gray-100 text-gray-700"
+                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+            }`}
+            title="Sort"
+          >
+            <ArrowUpDown className="h-4 w-4" />
+          </button>
+          {showSortPopover && (
+            <ScribePanelSortPopover
+              field={sortField}
+              direction={sortDirection}
+              onFieldChange={setSortField}
+              onDirectionChange={setSortDirection}
+              onClose={() => setShowSortPopover(false)}
+            />
+          )}
+        </div>
         <button
           className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
           title="Search"
