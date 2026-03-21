@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useAppStore } from "../../stores/appStore";
 import * as db from "../../lib/db";
-import type { Patient, Template } from "../../types";
+import type { Patient, Template, SessionNoteTab } from "../../types";
 import type { SerializedEditorState } from "lexical";
 import SessionTopBar from "./SessionTopBar";
 import SessionTabBar, { type SessionTab, getNoteId } from "./SessionTabBar";
@@ -91,6 +91,9 @@ export default function SessionView() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [showQuickPatient, setShowQuickPatient] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error"; visible: boolean }>({ message: "", variant: "success", visible: false });
+  const [noteTabs, setNoteTabs] = useState<SessionNoteTab[]>([]);
+  /** Lexical JSON for the currently active note tab (loaded from session_notes). */
+  const [activeNoteContent, setActiveNoteContent] = useState<SerializedEditorState | null>(null);
 
   const {
     devices,
@@ -187,8 +190,80 @@ export default function SessionView() {
     setStreamPreview(null);
     setConfirmRegenerate(false);
     setConfirmDelete(false);
+    setActiveNoteContent(null);
     resetTranscription();
   }, [activeSession?.id, resetTranscription]);
+
+  // Load or create default note tab when session changes
+  useEffect(() => {
+    if (!activeSession?.id) {
+      setNoteTabs([]);
+      return;
+    }
+    const sessionId = activeSession.id;
+    (async () => {
+      try {
+        let tabs = await db.getSessionNoteTabs(sessionId);
+        if (tabs.length === 0) {
+          // Create a default note tab using provider's default template
+          const provider = await db.getProvider();
+          let templateId = provider?.defaultTemplateId ?? null;
+          let templateName = "SOAP Note";
+          if (templateId) {
+            const tmpl = await db.getTemplate(templateId);
+            if (tmpl) {
+              templateName = tmpl.name;
+            } else {
+              templateId = null; // template was deleted
+            }
+          }
+          if (!templateId) {
+            // Fall back to first system template named "SOAP Note", or first template
+            const allTemplates = await db.listTemplates(provider?.id ?? "");
+            const soap = allTemplates.find((t) => t.name === "SOAP Note" && t.isSystem);
+            const fallback = soap ?? allTemplates[0];
+            if (fallback) {
+              templateId = fallback.id;
+              templateName = fallback.name;
+            }
+          }
+          if (templateId) {
+            const note = await db.createSessionNote({
+              sessionId,
+              templateId,
+              templateName,
+            });
+            tabs = [{ id: note.id, templateName: note.templateName }];
+          }
+        }
+        setNoteTabs(tabs);
+      } catch (err) {
+        console.error("Failed to load/create note tabs:", err);
+        setNoteTabs([]);
+      }
+    })();
+  }, [activeSession?.id]);
+
+  // Load note content when switching to a note tab
+  useEffect(() => {
+    const nid = getNoteId(activeTab);
+    if (!nid) {
+      setActiveNoteContent(null);
+      return;
+    }
+    (async () => {
+      try {
+        const note = await db.getSessionNote(nid);
+        if (note?.content) {
+          setActiveNoteContent(typeof note.content === "string" ? JSON.parse(note.content) : note.content);
+        } else {
+          setActiveNoteContent(null);
+        }
+      } catch {
+        setActiveNoteContent(null);
+      }
+    })();
+  }, [activeTab]);
 
   useEffect(() => {
     if (!activeSession?.patientId) {
@@ -450,9 +525,16 @@ export default function SessionView() {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const pending = pendingSaveRef.current;
       if (pending) {
-        db.updateSession(pending.sessionId, { [pending.field]: pending.state }).catch((err) =>
-          console.error(`Failed to flush pending save:`, err),
-        );
+        if (pending.field.startsWith("note:")) {
+          const nid = pending.field.slice(5);
+          db.updateSessionNote(nid, JSON.stringify(pending.state)).catch((err) =>
+            console.error(`Failed to flush pending note save:`, err),
+          );
+        } else {
+          db.updateSession(pending.sessionId, { [pending.field]: pending.state }).catch((err) =>
+            console.error(`Failed to flush pending save:`, err),
+          );
+        }
         pendingSaveRef.current = null;
       }
     };
@@ -507,20 +589,36 @@ export default function SessionView() {
   const handleEditorChange = useCallback(
     (state: SerializedEditorState) => {
       if (!activeSession) return;
-      const field = getTabField(activeTab);
+      const nid = getNoteId(activeTab);
 
-      pendingSaveRef.current = { sessionId: activeSession.id, field, state };
-
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(async () => {
-        pendingSaveRef.current = null;
-        try {
-          await db.updateSession(activeSession.id, { [field]: state });
-          mergeActiveSession(activeSession.id, { [field]: state });
-        } catch (err) {
-          console.error(`Failed to save ${field}:`, err);
-        }
-      }, SAVE_DEBOUNCE_MS);
+      if (nid) {
+        // Save to session_notes table
+        pendingSaveRef.current = { sessionId: activeSession.id, field: `note:${nid}`, state };
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(async () => {
+          pendingSaveRef.current = null;
+          try {
+            await db.updateSessionNote(nid, JSON.stringify(state));
+            setActiveNoteContent(state);
+          } catch (err) {
+            console.error(`Failed to save note ${nid}:`, err);
+          }
+        }, SAVE_DEBOUNCE_MS);
+      } else {
+        // Save to session table (context, transcript)
+        const field = getTabField(activeTab);
+        pendingSaveRef.current = { sessionId: activeSession.id, field, state };
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(async () => {
+          pendingSaveRef.current = null;
+          try {
+            await db.updateSession(activeSession.id, { [field]: state });
+            mergeActiveSession(activeSession.id, { [field]: state });
+          } catch (err) {
+            console.error(`Failed to save ${field}:`, err);
+          }
+        }, SAVE_DEBOUNCE_MS);
+      }
     },
     [activeSession, activeTab, mergeActiveSession],
   );
@@ -548,7 +646,9 @@ export default function SessionView() {
   const noteIsStreaming = getNoteId(activeTab) !== null && isStreaming && streamPreview;
   const initialState = noteIsStreaming
     ? streamPreview
-    : ((activeSession[field] as SerializedEditorState | null) ?? null);
+    : getNoteId(activeTab) !== null
+      ? activeNoteContent
+      : ((activeSession[field] as SerializedEditorState | null) ?? null);
   const isLiveTranscribing = captureState === "recording" || isTranscribing;
   const hasCompletedTranscript = !!activeSession.rawTranscript && !isLiveTranscribing;
   const isReadOnly =
@@ -782,7 +882,7 @@ export default function SessionView() {
         onTabChange={setActiveTab}
         locked={isLiveTranscribing}
         showTranscription={!!activeSession.rawTranscript || isLiveTranscribing}
-        noteTabs={activeSession.notes ? [{ id: "legacy", templateName: "Note" }] : []}
+        noteTabs={noteTabs}
       />
 
       {/* Patient context (read-only) — shown above editor on context tab */}
