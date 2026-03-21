@@ -23,6 +23,7 @@ import { markdownToLexical } from "../../lib/markdown-to-lexical";
 import { lexicalToHtml } from "../../lib/lexical-to-html";
 import ContextAttachments, { type AttachmentWithStatus } from "./ContextAttachments";
 import QuickPatientModal from "../patients/QuickPatientModal";
+import TemplateSelectorModal from "../templates/TemplateSelectorModal";
 import Toast from "../ui/Toast";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { copyFile, mkdir, remove, stat, writeFile } from "@tauri-apps/plugin-fs";
@@ -94,6 +95,7 @@ export default function SessionView() {
   const [noteTabs, setNoteTabs] = useState<SessionNoteTab[]>([]);
   /** Lexical JSON for the currently active note tab (loaded from session_notes). */
   const [activeNoteContent, setActiveNoteContent] = useState<SerializedEditorState | null>(null);
+  const [showAddNoteModal, setShowAddNoteModal] = useState(false);
 
   const {
     devices,
@@ -633,6 +635,34 @@ export default function SessionView() {
     [activeSession, activeTab, mergeActiveSession],
   );
 
+  /** Handle '+' button: user selects a template, we create a note and auto-generate. */
+  const handleAddNote = useCallback(async (templateId: string | null) => {
+    setShowAddNoteModal(false);
+    if (!templateId || !activeSession) return;
+    const tmpl = templates.find((t) => t.id === templateId);
+    if (!tmpl) return;
+
+    try {
+      const note = await db.createSessionNote({
+        sessionId: activeSession.id,
+        templateId: tmpl.id,
+        templateName: tmpl.name,
+      });
+      const newTab: SessionNoteTab = { id: note.id, templateName: note.templateName };
+      setNoteTabs((prev) => [...prev, newTab]);
+      setActiveTab(`note:${note.id}`);
+
+      // Auto-generate if transcript exists
+      const transcript = activeSession.rawTranscript;
+      if (transcript) {
+        const templateText = extractTextFromLexical(tmpl.content as SerializedEditorState);
+        generateNote(activeSession.id, note.id, transcript, templateText, getContextText());
+      }
+    } catch (err) {
+      console.error("Failed to add note tab:", err);
+    }
+  }, [activeSession, templates, generateNote, getContextText]);
+
   if (!activeSession) {
     return (
       <div className="flex items-center justify-center py-16 text-sm text-gray-400">
@@ -894,6 +924,7 @@ export default function SessionView() {
         locked={isLiveTranscribing}
         showTranscription={!!activeSession.rawTranscript || isLiveTranscribing}
         noteTabs={noteTabs}
+        onAddNote={() => setShowAddNoteModal(true)}
       />
 
       {/* Patient context (read-only) — shown above editor on context tab */}
@@ -1017,6 +1048,15 @@ export default function SessionView() {
           onCreated={handlePatientCreated}
         />
       )}
+
+      {/* Template selector for adding new note tabs */}
+      <TemplateSelectorModal
+        open={showAddNoteModal}
+        onClose={() => setShowAddNoteModal(false)}
+        templates={templates}
+        selectedTemplateId={selectedTemplateId}
+        onSelect={handleAddNote}
+      />
 
       {/* Toast notification */}
       <Toast
