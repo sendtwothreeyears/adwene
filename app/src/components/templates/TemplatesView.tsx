@@ -321,7 +321,7 @@ export default function TemplatesView() {
                         }`}
                         title={template.isFavourite ? "Unfavourite" : "Favourite"}
                       >
-                        <Star className="h-4 w-4" fill={template.isFavourite ? "currentColor" : "none"} />
+                        <Star className="h-4 w-4" fill={template.isFavourite ? "#eab308" : "none"} stroke={template.isFavourite ? "#eab308" : "currentColor"} />
                       </button>
                       <button
                         onClick={(e) => {
