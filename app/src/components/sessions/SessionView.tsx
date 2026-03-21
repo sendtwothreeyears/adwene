@@ -278,6 +278,9 @@ export default function SessionView() {
       setNoteLoading(false);
       return;
     }
+    // Clear immediately to prevent stale content from the previous tab being displayed
+    // while the async DB load is in progress.
+    setActiveNoteContent(null);
     setNoteLoading(true);
     (async () => {
       try {
@@ -294,6 +297,19 @@ export default function SessionView() {
       }
     })();
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync the template dropdown to match the active note tab's template.
+  // Separate from the content-loading effect to avoid re-fetching content when noteTabs changes.
+  useEffect(() => {
+    const nid = getNoteId(activeTab);
+    if (!nid) return;
+    const tab = noteTabs.find((t) => t.id === nid);
+    if (tab?.templateId) {
+      setSelectedTemplateId(tab.templateId);
+    } else {
+      setSelectedTemplateId(null);
+    }
+  }, [activeTab, noteTabs]);
 
   useEffect(() => {
     if (!activeSession?.patientId) {
@@ -516,12 +532,13 @@ export default function SessionView() {
             ? markdownToLexical(content)
             : (content as SerializedEditorState);
 
-        // Save to session_notes table
-        await db.updateSessionNote(noteId, JSON.stringify(lexicalState));
-        // Update local state if this note tab is currently active
+        // Update display IMMEDIATELY so there's no gap between streaming ending
+        // and the final content appearing. The DB write can happen after.
         if (getNoteId(activeTab) === noteId) {
           setActiveNoteContent(lexicalState);
         }
+        // Persist to session_notes table
+        await db.updateSessionNote(noteId, JSON.stringify(lexicalState));
 
         // Regenerate session title to reflect the current transcript
         const transcript = activeSession.rawTranscript;
@@ -626,17 +643,17 @@ export default function SessionView() {
           } catch { /* ignore parse errors */ }
         });
 
-        // Auto-generate note on default note tab
+        // Auto-generate note on default note tab using the tab's own template
         if (noteTabs.length > 0) {
           const defaultNoteTab = noteTabs[0];
           setActiveTab(`note:${defaultNoteTab.id}`);
-          generateNote(sid, defaultNoteTab.id, text, getSelectedTemplateText(), getContextText());
+          generateNote(sid, defaultNoteTab.id, text, getTemplateTextForNote(defaultNoteTab.id), getContextText());
         }
       } catch (err) {
         console.error("Failed to save rawTranscript:", err);
       }
     }
-  }, [stop, stopTranscription, activeSession, mergeActiveSession, send, onMessage, noteTabs, generateNote, getSelectedTemplateText, getContextText]);
+  }, [stop, stopTranscription, activeSession, mergeActiveSession, send, onMessage, noteTabs, generateNote, getTemplateTextForNote, getContextText]);
 
   const handleEditorChange = useCallback(
     (state: SerializedEditorState) => {
@@ -896,7 +913,26 @@ export default function SessionView() {
   }, [activeTab, activeSession, extractText, sidecarConnected]);
 
   const handleExportPDF = useCallback(async () => {
-    if (!activeSession?.notes) return;
+    // Flush any pending note save before exporting so the PDF uses the latest content
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    const pending = pendingSaveRef.current;
+    if (pending && pending.field.startsWith("note:")) {
+      const nid = pending.field.slice(5);
+      try { await db.updateSessionNote(nid, JSON.stringify(pending.state)); } catch (err) {
+        console.error("Failed to flush pending note save before PDF export:", err);
+      }
+      pendingSaveRef.current = null;
+    }
+
+    // Use pending state only if it belongs to the currently active note tab;
+    // otherwise fall back to activeNoteContent (the loaded content for the current tab).
+    const currentNid = getNoteId(activeTab);
+    const pendingIsForCurrentTab = pending?.field === `note:${currentNid}`;
+    const noteContent = pendingIsForCurrentTab ? pending.state as SerializedEditorState : activeNoteContent;
+    if (!noteContent) return;
     if (!sidecarConnected) {
       setError("Sidecar not connected — cannot generate PDF.");
       return;
@@ -905,8 +941,7 @@ export default function SessionView() {
     setIsExporting(true);
     try {
       // Convert Lexical state to HTML
-      const notes = activeSession.notes as SerializedEditorState;
-      const html = lexicalToHtml(notes);
+      const html = lexicalToHtml(noteContent);
 
       // Fetch provider data for footer
       const provider = await db.getProvider();
@@ -960,7 +995,7 @@ export default function SessionView() {
     } finally {
       setIsExporting(false);
     }
-  }, [activeSession, sidecarConnected, generatePdf]);
+  }, [activeSession, activeTab, activeNoteContent, sidecarConnected, generatePdf]);
 
   return (
     <div
