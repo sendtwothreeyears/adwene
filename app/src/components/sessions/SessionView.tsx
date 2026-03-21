@@ -707,12 +707,18 @@ export default function SessionView() {
       });
       const newTab: SessionNoteTab = { id: note.id, templateId: tmpl.id, templateName: note.templateName };
       setNoteTabs((prev) => [...prev, newTab]);
+      // Clear stale content before tab switch so the first render is clean
+      setActiveNoteContent(null);
+      setNoteLoading(true);
+      setStreamPreview(null);
       setActiveTab(`note:${note.id}`);
       setSelectedTemplateId(tmpl.id);
 
       // Auto-generate if transcript exists
       const transcript = activeSession.rawTranscript;
       if (transcript) {
+        resetSmooth();
+        wasStreamingRef.current = false;
         const templateText = extractTextFromLexical(tmpl.content as SerializedEditorState);
         generateNote(activeSession.id, note.id, transcript, templateText, getContextText());
       }
