@@ -1,6 +1,6 @@
 """Tests for shared prompts."""
 
-from sidecar.src.prompts import INSTRUCTIONS, ONE_SHOT_EXAMPLE, TITLE_PROMPT
+from sidecar.src.prompts import INSTRUCTIONS, TITLE_PROMPT
 
 
 class TestInstructionsStructure:
@@ -34,17 +34,6 @@ class TestInstructionsStructure:
 
     def test_references_template_block(self):
         assert "<template>" in INSTRUCTIONS
-
-
-class TestOneShotExample:
-    """Verify the 1-shot example demonstrates template adherence."""
-
-    def test_uses_xml_tags(self):
-        assert "<example>" in ONE_SHOT_EXAMPLE
-        assert "</example>" in ONE_SHOT_EXAMPLE
-
-    def test_shows_section_count_constraint(self):
-        assert "2 sections" in ONE_SHOT_EXAMPLE
 
 
 class TestTitlePrompt:

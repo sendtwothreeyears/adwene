@@ -76,11 +76,6 @@ class TestBuildNotePrompt:
         assert "<instructions>" in prompt
         assert "</instructions>" in prompt
 
-    def test_contains_example(self):
-        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript text")
-        assert "<example>" in prompt
-        assert "</example>" in prompt
-
     def test_contains_template_block(self):
         prompt = build_note_prompt(SOAP_TEMPLATE, "transcript text")
         assert "<template>" in prompt

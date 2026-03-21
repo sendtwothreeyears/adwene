@@ -25,7 +25,7 @@ def build_note_prompt(template: str, transcript: str, context: str = "") -> str:
     """
     section_count = count_sections(template)
 
-    parts = [INSTRUCTIONS, ONE_SHOT_EXAMPLE]
+    parts = [INSTRUCTIONS]
 
     if template:
         parts.append(f"<template>\n{template}\n</template>")
@@ -67,23 +67,6 @@ Rules:
 - If a section has no relevant information in the transcript, write "Not documented."
 - After completing the final section, stop immediately.
 </instructions>"""
-
-ONE_SHOT_EXAMPLE = """\
-<example>
-Given this template:
-## Chief Complaint
-## Assessment
-
-The correct output is:
-
-## Chief Complaint
-Patient presents with right knee pain for 3 weeks following a fall.
-
-## Assessment
-Right knee contusion with possible meniscal injury. Recommend MRI for further evaluation.
-
-(Exactly 2 sections were in the template, so exactly 2 sections were output.)
-</example>"""
 
 TITLE_PROMPT = """\
 Summarize the chief complaint or main topic of this medical encounter in 4 to 5 words. \
