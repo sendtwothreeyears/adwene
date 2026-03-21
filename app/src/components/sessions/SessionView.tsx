@@ -239,7 +239,7 @@ export default function SessionView() {
               templateId,
               templateName,
             });
-            tabs = [{ id: note.id, templateName: note.templateName }];
+            tabs = [{ id: note.id, templateId, templateName: note.templateName }];
           }
         }
         setNoteTabs(tabs);
@@ -675,9 +675,10 @@ export default function SessionView() {
         templateId: tmpl.id,
         templateName: tmpl.name,
       });
-      const newTab: SessionNoteTab = { id: note.id, templateName: note.templateName };
+      const newTab: SessionNoteTab = { id: note.id, templateId: tmpl.id, templateName: note.templateName };
       setNoteTabs((prev) => [...prev, newTab]);
       setActiveTab(`note:${note.id}`);
+      setSelectedTemplateId(tmpl.id);
 
       // Auto-generate if transcript exists
       const transcript = activeSession.rawTranscript;
@@ -965,7 +966,14 @@ export default function SessionView() {
 
       <SessionTabBar
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab);
+          const nid = getNoteId(tab);
+          if (nid) {
+            const nt = noteTabs.find((n) => n.id === nid);
+            if (nt) setSelectedTemplateId(nt.templateId);
+          }
+        }}
         locked={isLiveTranscribing}
         showTranscription={!!activeSession.rawTranscript || isLiveTranscribing}
         noteTabs={noteTabs}

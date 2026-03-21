@@ -514,7 +514,7 @@ export async function setTagsForTemplate(templateId: string, tagNames: string[])
 export async function getSessionNoteTabs(sessionId: string): Promise<SessionNoteTab[]> {
   const db = await getDb();
   return db.select<SessionNoteTab[]>(
-    "SELECT id, templateName FROM SessionNote WHERE sessionId = $1 ORDER BY createdAt ASC",
+    "SELECT id, templateId, templateName FROM SessionNote WHERE sessionId = $1 ORDER BY createdAt ASC",
     [sessionId]
   );
 }

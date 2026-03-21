@@ -172,6 +172,7 @@ export interface SessionNote {
 /** Lightweight reference for tab bar rendering (no content). */
 export interface SessionNoteTab {
   id: string;
+  templateId: string;
   templateName: string;
 }
 

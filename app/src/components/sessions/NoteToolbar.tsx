@@ -50,19 +50,11 @@ export default function NoteToolbar({
         <button
           type="button"
           onClick={() => setShowTemplateModal(true)}
-          className="inline-flex min-w-[200px] items-center justify-between rounded-lg border border-border bg-white px-4 py-1.5 text-left transition-colors hover:border-gray-400"
+          className="inline-flex items-center rounded-lg border border-border bg-white px-4 py-1.5 text-left transition-colors hover:border-gray-400"
         >
-          <span className="mr-1 truncate text-sm text-gray-900">
+          <span className="truncate text-sm text-gray-900">
             {selected?.name ?? "Select template"}
           </span>
-          <svg
-            className="h-5 w-5 shrink-0 text-gray-400"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
         </button>
         <TemplateSelectorModal
           open={showTemplateModal}
