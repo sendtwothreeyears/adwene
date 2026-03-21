@@ -234,7 +234,7 @@ export default function TemplatesView() {
 
       {/* Favourites section */}
       {!loading && favouriteTemplates.length > 0 && (
-        <div className="mb-5">
+        <div className="mb-8">
           <h2 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">Favourites</h2>
           <div className="flex flex-wrap gap-3">
             {favouriteTemplates.map((template) => (
