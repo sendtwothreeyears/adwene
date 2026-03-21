@@ -1080,6 +1080,15 @@ export default function SessionView() {
                             ),
                           );
                           db.updateSessionNoteTemplate(nid, templateId, newName);
+                          // Auto-regenerate note with the new template
+                          const transcript = activeSession.rawTranscript ?? "";
+                          if (transcript) {
+                            let templateText = "";
+                            if (tmpl?.content) {
+                              try { templateText = extractTextFromLexical(tmpl.content as SerializedEditorState); } catch { /* ignore */ }
+                            }
+                            generateNote(activeSession.id, nid, transcript, templateText, getContextText());
+                          }
                         }
                       }}
                       onExportPDF={handleExportPDF}
