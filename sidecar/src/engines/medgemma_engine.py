@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 import mlx.core as mx
 
 from .. import config
-from ..prompts import TITLE_PROMPT, build_note_prompt, estimate_max_tokens
+from ..prompts import TITLE_PROMPT, build_note_prompt, estimate_max_tokens, strip_model_artifacts
 from .base import NoteEngine
 
 logger = logging.getLogger("kasamd-sidecar")
@@ -76,21 +76,23 @@ class MedGemmaEngine(NoteEngine):
         )
         mx.synchronize()  # Flush Metal command buffers before releasing executor
 
+        output = strip_model_artifacts(result.text)
+
         # Post-hoc repetition detection
         from ..repetition_detector import RepetitionDetector
 
         detector = RepetitionDetector()
-        detector.feed(result.text)
+        detector.feed(output)
         if detector.is_looping:
             clean = detector.clean_text
             logger.warning(
                 "Repetition loop detected, truncated at %d chars (original %d chars)",
                 len(clean),
-                len(result.text),
+                len(output),
             )
             return clean
 
-        return result.text
+        return output
 
     async def generate_stream(
         self, transcript: str, template: str, context: str = ""
@@ -151,6 +153,16 @@ class MedGemmaEngine(NoteEngine):
                     continue
                 chunk = decoded[len(prev_text):]
                 if chunk:
+                    # Check for Gemma control tokens leaking through
+                    from ..prompts import _STOP_PATTERNS
+                    stop_match = _STOP_PATTERNS.search(chunk)
+                    if stop_match:
+                        # Send only the text before the control token
+                        clean_chunk = chunk[:stop_match.start()]
+                        if clean_chunk:
+                            loop.call_soon_threadsafe(queue.put_nowait, clean_chunk)
+                        logger.info("Model artifact detected, stopping stream")
+                        break
                     prev_text = decoded
                     detector.feed(chunk)
                     if detector.is_looping:

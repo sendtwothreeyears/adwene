@@ -68,6 +68,25 @@ Rules:
 - After completing the final section, stop immediately.
 </instructions>"""
 
+# Gemma control tokens that leak through skip_special_tokens=True
+_STOP_PATTERNS = re.compile(
+    r"</model|<unused\d+>|<\|end\|>|<\|assistant\|>"
+)
+
+
+def strip_model_artifacts(text: str) -> str:
+    """Truncate output at the first Gemma control token that leaked through.
+
+    MedGemma sometimes emits </model, <unused94>, etc. as plain text
+    after the actual note content. Everything after these is internal
+    reasoning/metadata that should not be shown to the user.
+    """
+    match = _STOP_PATTERNS.search(text)
+    if match:
+        text = text[:match.start()]
+    return text.rstrip()
+
+
 TITLE_PROMPT = """\
 Summarize the chief complaint or main topic of this medical encounter in 4 to 5 words. \
 The title must be a cohesive phrase, not a truncated sentence. \
