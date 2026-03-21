@@ -256,7 +256,7 @@ export default function TemplatesView() {
                   </button>
                 </div>
                 {menuOpenId === `fav-${template.id}` && (
-                  <div className="absolute right-0 top-full mt-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-20" data-menu-container>
+                  <div className="absolute left-full top-0 ml-1 w-48 rounded-md border border-gray-200 bg-white py-1 shadow-lg z-50" data-menu-container>
                     {!template.isSystem && (
                       <button
                         onClick={(e) => { e.stopPropagation(); setMenuOpenId(null); setEditingTemplate(template); }}
