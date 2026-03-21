@@ -45,7 +45,7 @@ export default function ScribePanelSortPopover({
       {SORT_FIELDS.map((f) => (
         <button
           key={f.value}
-          onClick={() => onFieldChange(f.value)}
+          onClick={() => { onFieldChange(f.value); onClose(); }}
           className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
         >
           <span
@@ -68,7 +68,7 @@ export default function ScribePanelSortPopover({
       {(["asc", "desc"] as const).map((dir) => (
         <button
           key={dir}
-          onClick={() => onDirectionChange(dir)}
+          onClick={() => { onDirectionChange(dir); onClose(); }}
           className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
         >
           <span className="w-4 text-center text-xs">

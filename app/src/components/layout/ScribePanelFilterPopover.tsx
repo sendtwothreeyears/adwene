@@ -69,6 +69,7 @@ export default function ScribePanelFilterPopover({
       setRangeStart(start);
       setRangeEnd(end);
       onDateFilterChange({ type: "custom", start, end });
+      onClose();
     }
   }
 
@@ -107,7 +108,7 @@ export default function ScribePanelFilterPopover({
                     } else {
                       onDateFilterChange({ type: "preset", days: preset.days });
                     }
-                    setShowCalendar(false);
+                    onClose();
                   }}
                   className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-gray-50 ${
                     isActive ? "bg-primary/5 text-gray-900" : "text-gray-700"
