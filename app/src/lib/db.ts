@@ -561,6 +561,15 @@ export async function updateSessionNote(noteId: string, content: string): Promis
   );
 }
 
+export async function updateSessionNoteTemplate(noteId: string, templateId: string, templateName: string): Promise<void> {
+  const db = await getDb();
+  const now = nowISO();
+  await db.execute(
+    "UPDATE SessionNote SET templateId = $1, templateName = $2, updatedAt = $3 WHERE id = $4",
+    [templateId, templateName, now, noteId]
+  );
+}
+
 export async function deleteSessionNote(noteId: string): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM SessionNote WHERE id = $1", [noteId]);

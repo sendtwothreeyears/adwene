@@ -336,6 +336,19 @@ export default function SessionView() {
     }
   }, [selectedTemplateId, templates]);
 
+  /** Get template text for a specific note tab (by noteId), avoiding stale global state. */
+  const getTemplateTextForNote = useCallback((noteId: string) => {
+    const noteTab = noteTabs.find((t) => t.id === noteId);
+    if (!noteTab) return getSelectedTemplateText();
+    const tmpl = templates.find((t) => t.id === noteTab.templateId);
+    if (!tmpl?.content) return "";
+    try {
+      return extractTextFromLexical(tmpl.content as SerializedEditorState);
+    } catch {
+      return "";
+    }
+  }, [noteTabs, templates, getSelectedTemplateText]);
+
   /** Gather all context sources into a single string for note generation. */
   const getContextText = useCallback(() => {
     const parts: string[] = [];
@@ -1031,7 +1044,7 @@ export default function SessionView() {
                         type="button"
                         onClick={() => {
                           setConfirmRegenerate(false);
-                          { const nid = getNoteId(activeTab); if (nid) generateNote(activeSession.id, nid, activeSession.rawTranscript ?? "", getSelectedTemplateText(), getContextText()); }
+                          { const nid = getNoteId(activeTab); if (nid) generateNote(activeSession.id, nid, activeSession.rawTranscript ?? "", getTemplateTextForNote(nid), getContextText()); }
                         }}
                         className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                       >
@@ -1054,7 +1067,21 @@ export default function SessionView() {
                       canGenerate={!!activeSession.rawTranscript}
                       templates={templates}
                       selectedTemplateId={selectedTemplateId}
-                      onTemplateChange={setSelectedTemplateId}
+                      onTemplateChange={(templateId) => {
+                        setSelectedTemplateId(templateId);
+                        // Sync the note tab's templateId so regeneration uses the correct template
+                        const nid = getNoteId(activeTab);
+                        if (nid) {
+                          const tmpl = templates.find((t) => t.id === templateId);
+                          const newName = tmpl?.name ?? "Note";
+                          setNoteTabs((prev) =>
+                            prev.map((t) =>
+                              t.id === nid ? { ...t, templateId, templateName: newName } : t,
+                            ),
+                          );
+                          db.updateSessionNoteTemplate(nid, templateId, newName);
+                        }
+                      }}
                       onExportPDF={handleExportPDF}
                       showEntityHighlights={showEntityHighlights}
                       onToggleEntityHighlights={toggleEntityHighlights}
@@ -1071,7 +1098,7 @@ export default function SessionView() {
                         if (activeNoteContent) {
                           setConfirmRegenerate(true);
                         } else {
-                          { const nid = getNoteId(activeTab); if (nid) generateNote(activeSession.id, nid, activeSession.rawTranscript ?? "", getSelectedTemplateText(), getContextText()); }
+                          { const nid = getNoteId(activeTab); if (nid) generateNote(activeSession.id, nid, activeSession.rawTranscript ?? "", getTemplateTextForNote(nid), getContextText()); }
                         }
                       }}
                       onDelete={() => {
