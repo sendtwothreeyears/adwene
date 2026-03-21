@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Calendar, ChevronRight, User, Check } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
@@ -17,6 +18,7 @@ const DATE_PRESETS: { label: string; days: number }[] = [
 ];
 
 interface Props {
+  anchorEl: HTMLElement | null;
   dateFilter: DateFilter;
   onDateFilterChange: (filter: DateFilter) => void;
   patients: Record<string, Patient>;
@@ -26,6 +28,7 @@ interface Props {
 }
 
 export default function ScribePanelFilterPopover({
+  anchorEl,
   dateFilter,
   onDateFilterChange,
   patients,
@@ -46,24 +49,27 @@ export default function ScribePanelFilterPopover({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target as Node) &&
+        anchorEl &&
+        !anchorEl.contains(e.target as Node)
+      ) {
         onClose();
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
+  }, [onClose, anchorEl]);
 
   const isDateActive = dateFilter.type !== "all";
   const isCustomActive = dateFilter.type === "custom";
 
   function handleDayClick(day: Date) {
     if (!rangeStart || (rangeStart && rangeEnd)) {
-      // Start new range
       setRangeStart(day);
       setRangeEnd(undefined);
     } else {
-      // Complete range
       const start = day < rangeStart ? day : rangeStart;
       const end = day < rangeStart ? rangeStart : day;
       setRangeStart(start);
@@ -73,16 +79,22 @@ export default function ScribePanelFilterPopover({
     }
   }
 
-  return (
+  if (!anchorEl) return null;
+
+  const rect = anchorEl.getBoundingClientRect();
+
+  return createPortal(
     <div
       ref={ref}
-      className="absolute left-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+      className="fixed z-[9999] w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+      style={{ top: rect.bottom + 4, left: rect.left }}
     >
       {/* Date filter */}
       <div className="relative">
         <button
           onClick={() => {
             setShowDateMenu((v) => !v);
+            setShowPatientMenu(false);
             setShowCalendar(false);
           }}
           className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-gray-50 ${
@@ -95,7 +107,10 @@ export default function ScribePanelFilterPopover({
         </button>
 
         {showDateMenu && (
-          <div className="absolute left-full top-0 ml-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          <div
+            className="fixed z-[9999] w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            style={{ top: rect.bottom + 4, left: rect.left + 192 + 4 }}
+          >
             {DATE_PRESETS.map((preset) => {
               const isActive =
                 dateFilter.type === "preset" && dateFilter.days === preset.days;
@@ -139,7 +154,10 @@ export default function ScribePanelFilterPopover({
         )}
 
         {showDateMenu && showCalendar && (
-          <div className="absolute left-full top-0 ml-[calc(11rem+0.25rem)] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+          <div
+            className="fixed z-[9999] rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+            style={{ top: rect.bottom + 4, left: rect.left + 192 + 176 + 8 }}
+          >
             <DayPicker
               mode="range"
               numberOfMonths={2}
@@ -179,7 +197,10 @@ export default function ScribePanelFilterPopover({
         </button>
 
         {showPatientMenu && (
-          <div className="absolute left-full top-0 ml-1 max-h-64 w-52 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          <div
+            className="fixed z-[9999] max-h-64 w-52 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+            style={{ top: rect.bottom + 4, left: rect.left + 192 + 4 }}
+          >
             {Object.values(patients).length === 0 ? (
               <p className="px-3 py-2 text-xs text-gray-400">
                 No patients found
@@ -228,6 +249,7 @@ export default function ScribePanelFilterPopover({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

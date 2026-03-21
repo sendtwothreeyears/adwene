@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 export type SortField = "createdAt" | "updatedAt" | "name" | "status";
 export type SortDirection = "asc" | "desc";
@@ -11,6 +12,7 @@ const SORT_FIELDS: { value: SortField; label: string }[] = [
 ];
 
 interface Props {
+  anchorEl: HTMLElement | null;
   field: SortField;
   direction: SortDirection;
   onFieldChange: (field: SortField) => void;
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export default function ScribePanelSortPopover({
+  anchorEl,
   field,
   direction,
   onFieldChange,
@@ -29,18 +32,28 @@ export default function ScribePanelSortPopover({
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target as Node) &&
+        anchorEl &&
+        !anchorEl.contains(e.target as Node)
+      ) {
         onClose();
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
+  }, [onClose, anchorEl]);
 
-  return (
+  if (!anchorEl) return null;
+
+  const rect = anchorEl.getBoundingClientRect();
+
+  return createPortal(
     <div
       ref={ref}
-      className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+      className="fixed z-[9999] w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+      style={{ top: rect.bottom + 4, left: rect.left }}
     >
       {SORT_FIELDS.map((f) => (
         <button
@@ -77,6 +90,7 @@ export default function ScribePanelSortPopover({
           {dir === "asc" ? "Ascending" : "Descending"}
         </button>
       ))}
-    </div>
+    </div>,
+    document.body
   );
 }

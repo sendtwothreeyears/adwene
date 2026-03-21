@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Search,
   UserRound,
@@ -64,6 +64,8 @@ export default function ScribePanel() {
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: "all" });
   const [patientFilter, setPatientFilter] = useState<Set<string>>(new Set());
   const [showFilterPopover, setShowFilterPopover] = useState(false);
+  const filterBtnRef = useRef<HTMLButtonElement>(null);
+  const sortBtnRef = useRef<HTMLButtonElement>(null);
 
   const selectionMode = selectedIds.size > 0;
 
@@ -267,57 +269,57 @@ export default function ScribePanel() {
 
       {/* Toolbar */}
       <div className="flex items-center justify-end gap-1 px-3 pb-2">
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowFilterPopover((v) => !v);
-              setShowSortPopover(false);
-            }}
-            className={`rounded-md p-1.5 transition-colors ${
-              showFilterPopover || dateFilter.type !== "all" || patientFilter.size > 0
-                ? "bg-gray-100 text-gray-700"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            }`}
-            title="Filter"
-          >
-            <ListFilter className="h-4 w-4" />
-          </button>
-          {showFilterPopover && (
-            <ScribePanelFilterPopover
-              dateFilter={dateFilter}
-              onDateFilterChange={setDateFilter}
-              patients={patients}
-              patientFilter={patientFilter}
-              onPatientFilterChange={setPatientFilter}
-              onClose={() => setShowFilterPopover(false)}
-            />
-          )}
-        </div>
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowSortPopover((v) => !v);
-              setShowFilterPopover(false);
-            }}
-            className={`rounded-md p-1.5 transition-colors ${
-              showSortPopover || sortField !== "createdAt" || sortDirection !== "desc"
-                ? "bg-gray-100 text-gray-700"
-                : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
-            }`}
-            title="Sort"
-          >
-            <ArrowUpDown className="h-4 w-4" />
-          </button>
-          {showSortPopover && (
-            <ScribePanelSortPopover
-              field={sortField}
-              direction={sortDirection}
-              onFieldChange={setSortField}
-              onDirectionChange={setSortDirection}
-              onClose={() => setShowSortPopover(false)}
-            />
-          )}
-        </div>
+        <button
+          ref={filterBtnRef}
+          onClick={() => {
+            setShowFilterPopover((v) => !v);
+            setShowSortPopover(false);
+          }}
+          className={`rounded-md p-1.5 transition-colors ${
+            showFilterPopover || dateFilter.type !== "all" || patientFilter.size > 0
+              ? "bg-gray-100 text-gray-700"
+              : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          }`}
+          title="Filter"
+        >
+          <ListFilter className="h-4 w-4" />
+        </button>
+        {showFilterPopover && (
+          <ScribePanelFilterPopover
+            anchorEl={filterBtnRef.current}
+            dateFilter={dateFilter}
+            onDateFilterChange={setDateFilter}
+            patients={patients}
+            patientFilter={patientFilter}
+            onPatientFilterChange={setPatientFilter}
+            onClose={() => setShowFilterPopover(false)}
+          />
+        )}
+        <button
+          ref={sortBtnRef}
+          onClick={() => {
+            setShowSortPopover((v) => !v);
+            setShowFilterPopover(false);
+          }}
+          className={`rounded-md p-1.5 transition-colors ${
+            showSortPopover || sortField !== "createdAt" || sortDirection !== "desc"
+              ? "bg-gray-100 text-gray-700"
+              : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+          }`}
+          title="Sort"
+        >
+          <ArrowUpDown className="h-4 w-4" />
+        </button>
+        {showSortPopover && (
+          <ScribePanelSortPopover
+            anchorEl={sortBtnRef.current}
+            field={sortField}
+            direction={sortDirection}
+            onFieldChange={setSortField}
+            onDirectionChange={setSortDirection}
+            onClose={() => setShowSortPopover(false)}
+          />
+        )}
         <button
           className="rounded-md p-1.5 text-gray-500 transition-colors cursor-default"
           title="Search"
