@@ -80,6 +80,12 @@ pub fn run() {
             sql: include_str!("../migrations/012_create_tags.sql"),
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 13,
+            description: "create_session_notes_table",
+            sql: include_str!("../migrations/013_create_session_notes.sql"),
+            kind: MigrationKind::Up,
+        },
     ];
 
     let app = tauri::Builder::default()
