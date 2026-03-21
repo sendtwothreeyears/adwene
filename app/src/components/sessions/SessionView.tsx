@@ -708,17 +708,58 @@ export default function SessionView() {
   const handleDeleteNote = useCallback(async (noteId: string) => {
     setConfirmDeleteNote(null);
     try {
+      const isLastNote = noteTabs.length === 1 && noteTabs[0].id === noteId;
       await db.deleteSessionNote(noteId);
-      setNoteTabs((prev) => prev.filter((t) => t.id !== noteId));
-      // If we deleted the active tab, switch to context
-      if (getNoteId(activeTab) === noteId) {
-        setActiveTab("context");
-        setActiveNoteContent(null);
+
+      if (isLastNote && activeSession) {
+        // Recreate a default note tab so there's always at least one
+        const provider = await db.getProvider();
+        let templateId = provider?.defaultTemplateId ?? null;
+        let templateName = "SOAP Note";
+        if (templateId) {
+          const tmpl = await db.getTemplate(templateId);
+          if (tmpl) {
+            templateName = tmpl.name;
+          } else {
+            templateId = null;
+          }
+        }
+        if (!templateId) {
+          const allTemplates = await db.listTemplates(provider?.id ?? "");
+          const soap = allTemplates.find((t) => t.name === "SOAP Note" && t.isSystem);
+          const fallback = soap ?? allTemplates[0];
+          if (fallback) {
+            templateId = fallback.id;
+            templateName = fallback.name;
+          }
+        }
+        if (templateId) {
+          const note = await db.createSessionNote({
+            sessionId: activeSession.id,
+            templateId,
+            templateName,
+          });
+          const newTab = { id: note.id, templateId, templateName: note.templateName };
+          setNoteTabs([newTab]);
+          setActiveTab(`note:${note.id}`);
+          setSelectedTemplateId(templateId);
+          setActiveNoteContent(null);
+        } else {
+          setNoteTabs([]);
+          setActiveTab("context");
+          setActiveNoteContent(null);
+        }
+      } else {
+        setNoteTabs((prev) => prev.filter((t) => t.id !== noteId));
+        if (getNoteId(activeTab) === noteId) {
+          setActiveTab("context");
+          setActiveNoteContent(null);
+        }
       }
     } catch (err) {
       console.error("Failed to delete note:", err);
     }
-  }, [activeTab]);
+  }, [activeTab, noteTabs, activeSession]);
 
   if (!activeSession) {
     return (
