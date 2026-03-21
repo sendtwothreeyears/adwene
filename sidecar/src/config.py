@@ -24,7 +24,7 @@ MEDGEMMA_MODEL_ID = os.getenv("MEDGEMMA_MODEL_ID", "/Users/Shared/Code/kasamd_of
 MEDGEMMA_TEMPERATURE: float = float(os.getenv("MEDGEMMA_TEMPERATURE", "0.35"))
 MEDGEMMA_REPETITION_PENALTY: float = float(os.getenv("MEDGEMMA_REPETITION_PENALTY", "1.05"))
 MEDGEMMA_REPETITION_CONTEXT_SIZE: int = int(os.getenv("MEDGEMMA_REPETITION_CONTEXT_SIZE", "128"))
-MEDGEMMA_TOP_P: float = float(os.getenv("MEDGEMMA_TOP_P", "0.9"))
+MEDGEMMA_TOP_P: float = float(os.getenv("MEDGEMMA_TOP_P", "0.65"))
 MEDGEMMA_MAX_TOKENS: int = int(os.getenv("MEDGEMMA_MAX_TOKENS", "1500"))
 
 # -- Decoding configuration --

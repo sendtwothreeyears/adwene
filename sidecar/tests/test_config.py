@@ -13,7 +13,7 @@ class TestMedGemmaConfigDefaults:
         assert config.MEDGEMMA_REPETITION_PENALTY == 1.05
 
     def test_top_p(self):
-        assert config.MEDGEMMA_TOP_P == 0.9
+        assert config.MEDGEMMA_TOP_P == 0.65
 
     def test_max_tokens(self):
         assert config.MEDGEMMA_MAX_TOKENS == 1500

@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 import mlx.core as mx
 
 from .. import config
-from ..prompts import SYSTEM_PROMPT, TITLE_PROMPT
+from ..prompts import TITLE_PROMPT, build_note_prompt, estimate_max_tokens
 from .base import NoteEngine
 
 logger = logging.getLogger("kasamd-sidecar")
@@ -57,24 +57,17 @@ class MedGemmaEngine(NoteEngine):
     def _generate_sync(self, transcript: str, template: str, context: str = "") -> str:
         from mlx_vlm import generate
 
-        system = SYSTEM_PROMPT
-        if template:
-            system += f"\n\nFormat the note using the following section structure:\n\n{template}"
-        if context:
-            system += f"\n\nAdditional context:\n{context}"
-
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": f"Transcript:\n{transcript}"},
-        ]
-
+        prompt_text = build_note_prompt(template, transcript, context)
+        messages = [{"role": "user", "content": prompt_text}]
         prompt = self._format_prompt(messages)
+
+        max_tokens = estimate_max_tokens(template) if template else config.MEDGEMMA_MAX_TOKENS
 
         result = generate(
             self._model,
             self._processor,
             prompt,
-            max_tokens=config.MEDGEMMA_MAX_TOKENS,
+            max_tokens=max_tokens,
             verbose=False,
             temperature=config.MEDGEMMA_TEMPERATURE,
             repetition_penalty=config.MEDGEMMA_REPETITION_PENALTY,
@@ -107,18 +100,11 @@ class MedGemmaEngine(NoteEngine):
 
         loop = asyncio.get_running_loop()
 
-        system = SYSTEM_PROMPT
-        if template:
-            system += f"\n\nFormat the note using the following section structure:\n\n{template}"
-        if context:
-            system += f"\n\nAdditional context:\n{context}"
-
-        messages = [
-            {"role": "system", "content": system},
-            {"role": "user", "content": f"Transcript:\n{transcript}"},
-        ]
-
+        prompt_text = build_note_prompt(template, transcript, context)
+        messages = [{"role": "user", "content": prompt_text}]
         prompt = self._format_prompt(messages)
+
+        max_tokens = estimate_max_tokens(template) if template else config.MEDGEMMA_MAX_TOKENS
 
         # stream_generate is synchronous generator — run in executor with a
         # queue to bridge to async.  A sentinel of None means "done";
@@ -145,7 +131,7 @@ class MedGemmaEngine(NoteEngine):
                 self._model,
                 self._processor,
                 prompt,
-                max_tokens=config.MEDGEMMA_MAX_TOKENS,
+                max_tokens=max_tokens,
                 temperature=config.MEDGEMMA_TEMPERATURE,
                 repetition_penalty=config.MEDGEMMA_REPETITION_PENALTY,
                 repetition_context_size=config.MEDGEMMA_REPETITION_CONTEXT_SIZE,
@@ -213,8 +199,7 @@ class MedGemmaEngine(NoteEngine):
         from mlx_vlm import generate
 
         messages = [
-            {"role": "system", "content": TITLE_PROMPT},
-            {"role": "user", "content": f"Transcript:\n{transcript}"},
+            {"role": "user", "content": f"{TITLE_PROMPT}\n\nTranscript:\n{transcript}"},
         ]
 
         prompt = self._format_prompt(messages)

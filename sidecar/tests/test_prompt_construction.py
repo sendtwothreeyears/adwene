@@ -1,98 +1,139 @@
 """Tests for template-driven prompt construction.
 
-Verifies that the system prompt + template injection produces correct prompts
-for different template types, ensuring no format-specific bias leaks through.
+Verifies that build_note_prompt produces correct prompts for different
+template types, ensuring strict template adherence and proper structure.
 """
 
-from sidecar.src.prompts import SYSTEM_PROMPT
-
-
-def _build_system_prompt(template: str = "", context: str = "") -> str:
-    """Replicate the prompt construction logic from MedGemmaEngine."""
-    system = SYSTEM_PROMPT
-    if template:
-        system += f"\n\nFormat the note using the following section structure:\n\n{template}"
-    if context:
-        system += f"\n\nAdditional context:\n{context}"
-    return system
-
-
-SOAP_TEMPLATE = (
-    "Subjective\nChief Complaint\nHistory of Present Illness\n"
-    "Objective\nPhysical Examination\nAssessment\nPlan"
-)
-
-HP_TEMPLATE = (
-    "Patient Information\nHistory of Present Illness\n"
-    "Past Medical History\nMedications\nAllergies\n"
-    "Social History\nFamily History\nReview of Systems\n"
-    "Physical Examination\nAssessment and Plan"
-)
-
-PROGRESS_NOTE_TEMPLATE = (
-    "Progress Note\nSubjective\nObjective\n"
-    "Assessment\nPlan"
+from sidecar.src.prompts import (
+    build_note_prompt,
+    count_sections,
+    estimate_max_tokens,
 )
 
 
-class TestBasePromptNeutrality:
-    """The base system prompt should not bias toward any specific note format."""
+SOAP_TEMPLATE = """\
+## Subjective
+## Objective
+## Assessment
+## Plan"""
 
-    def test_no_soap_sections(self):
-        assert "Subjective" not in SYSTEM_PROMPT
-        assert "Objective" not in SYSTEM_PROMPT
-        assert "Assessment" not in SYSTEM_PROMPT
+HP_TEMPLATE = """\
+## Patient Information
+## History of Present Illness
+## Past Medical History
+## Physical Examination
+## Assessment and Plan"""
 
-    def test_no_hp_sections(self):
-        assert "Patient Information" not in SYSTEM_PROMPT
-        assert "Assessment and Plan" not in SYSTEM_PROMPT
-
-    def test_no_example_block(self):
-        assert "Example:" not in SYSTEM_PROMPT
-
-    def test_instructs_to_follow_template(self):
-        assert "formatting instructions" in SYSTEM_PROMPT.lower() or \
-               "section structure" in SYSTEM_PROMPT.lower()
+SINGLE_SECTION_TEMPLATE = """\
+## Chief Complaint
+[Only list the chief complaint]"""
 
 
-class TestTemplateInjection:
-    """Template text should be injected as the primary format directive."""
+class TestCountSections:
+    def test_counts_h2_headings(self):
+        assert count_sections(SOAP_TEMPLATE) == 4
 
-    def test_no_template_produces_base_prompt_only(self):
-        prompt = _build_system_prompt(template="")
-        assert prompt == SYSTEM_PROMPT
+    def test_counts_h1_headings(self):
+        assert count_sections("# Section One\n# Section Two") == 2
 
-    def test_soap_template_includes_soap_sections(self):
-        prompt = _build_system_prompt(template=SOAP_TEMPLATE)
+    def test_mixed_headings(self):
+        assert count_sections("# Top\n## Sub1\n## Sub2") == 3
+
+    def test_no_headings_returns_zero(self):
+        assert count_sections("Just plain text") == 0
+
+    def test_single_section(self):
+        assert count_sections(SINGLE_SECTION_TEMPLATE) == 1
+
+    def test_empty_string(self):
+        assert count_sections("") == 0
+
+
+class TestEstimateMaxTokens:
+    def test_single_section_gets_minimum(self):
+        assert estimate_max_tokens(SINGLE_SECTION_TEMPLATE) == 400
+
+    def test_four_sections(self):
+        assert estimate_max_tokens(SOAP_TEMPLATE) == 1400
+
+    def test_no_sections_returns_default(self):
+        assert estimate_max_tokens("plain text") == 1500
+
+    def test_large_template_capped(self):
+        big = "\n".join(f"## Section {i}" for i in range(20))
+        assert estimate_max_tokens(big) == 2000
+
+
+class TestBuildNotePrompt:
+    """Verify the assembled prompt has the right structure."""
+
+    def test_is_single_string(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "Patient has chest pain")
+        assert isinstance(prompt, str)
+
+    def test_contains_instructions(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript text")
+        assert "<instructions>" in prompt
+        assert "</instructions>" in prompt
+
+    def test_contains_example(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript text")
+        assert "<example>" in prompt
+        assert "</example>" in prompt
+
+    def test_contains_template_block(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript text")
+        assert "<template>" in prompt
+        assert "</template>" in prompt
         assert "Subjective" in prompt
-        assert "Assessment" in prompt
-        assert "Plan" in prompt
+
+    def test_contains_transcript_block(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "Patient has chest pain")
+        assert "<transcript>" in prompt
+        assert "Patient has chest pain" in prompt
+
+    def test_section_count_anchor_for_soap(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript")
+        assert "exactly 4 section(s)" in prompt
+
+    def test_section_count_anchor_for_single(self):
+        prompt = build_note_prompt(SINGLE_SECTION_TEMPLATE, "transcript")
+        assert "exactly 1 section(s)" in prompt
 
     def test_hp_template_includes_hp_sections(self):
-        prompt = _build_system_prompt(template=HP_TEMPLATE)
+        prompt = build_note_prompt(HP_TEMPLATE, "transcript")
         assert "Patient Information" in prompt
         assert "Assessment and Plan" in prompt
 
-    def test_hp_template_does_not_add_soap_bias(self):
-        prompt = _build_system_prompt(template=HP_TEMPLATE)
-        # The only "Subjective" or "Objective" should come from the template, not the base prompt
-        # HP template doesn't contain "Subjective" so it shouldn't appear
-        base_end = len(SYSTEM_PROMPT)
-        base_portion = prompt[:base_end]
-        assert "Subjective" not in base_portion
-        assert "Objective" not in base_portion
+    def test_hp_does_not_add_soap_bias(self):
+        prompt = build_note_prompt(HP_TEMPLATE, "transcript")
+        # Only the example block has "Chief Complaint" and "Assessment" —
+        # the instructions block should not have SOAP section names
+        instructions_end = prompt.index("</instructions>")
+        instructions = prompt[:instructions_end]
+        assert "Subjective" not in instructions
+        assert "Objective" not in instructions
 
-    def test_template_appears_before_context(self):
-        prompt = _build_system_prompt(template=SOAP_TEMPLATE, context="Patient has diabetes")
-        template_pos = prompt.index("Subjective")
-        context_pos = prompt.index("Patient has diabetes")
-        assert template_pos < context_pos
+    def test_template_before_transcript(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "the transcript text")
+        template_pos = prompt.index("<template>")
+        transcript_pos = prompt.index("<transcript>")
+        assert template_pos < transcript_pos
 
-    def test_template_uses_directive_phrasing(self):
-        prompt = _build_system_prompt(template=SOAP_TEMPLATE)
-        assert "Format the note using the following section structure:" in prompt
+    def test_context_included_when_provided(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript", context="Patient has diabetes")
+        assert "<context>" in prompt
+        assert "Patient has diabetes" in prompt
 
-    def test_empty_string_template_treated_as_no_template(self):
-        prompt = _build_system_prompt(template="")
-        assert "Format the note" not in prompt
-        assert prompt == SYSTEM_PROMPT
+    def test_context_omitted_when_empty(self):
+        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript", context="")
+        assert "<context>" not in prompt
+
+    def test_no_template_omits_template_block(self):
+        prompt = build_note_prompt("", "transcript")
+        assert "</template>" not in prompt
+
+    def test_no_system_role_markers(self):
+        """The prompt should not contain system-role artifacts."""
+        prompt = build_note_prompt(SOAP_TEMPLATE, "transcript")
+        assert "system" not in prompt.lower().split("<")[0]  # no "system:" prefix

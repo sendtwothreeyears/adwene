@@ -1,35 +1,55 @@
 """Tests for shared prompts."""
 
-from sidecar.src.prompts import SYSTEM_PROMPT
+from sidecar.src.prompts import INSTRUCTIONS, ONE_SHOT_EXAMPLE, TITLE_PROMPT
 
 
-class TestSystemPromptStructure:
-    """Verify the system prompt meets the design contract."""
+class TestInstructionsStructure:
+    """Verify the instructions block meets the design contract."""
 
-    def test_prompt_under_token_budget(self):
-        """Prompt should be ~150 tokens; enforce a generous 200-word ceiling."""
-        assert len(SYSTEM_PROMPT.split()) <= 200
+    def test_instructions_under_token_budget(self):
+        """Instructions should be concise; enforce a generous 200-word ceiling."""
+        assert len(INSTRUCTIONS.split()) <= 200
 
     def test_contains_role_identity(self):
-        assert "clinical documentation assistant" in SYSTEM_PROMPT
+        assert "clinical documentation assistant" in INSTRUCTIONS
 
     def test_contains_heading_formatting_instruction(self):
-        assert "markdown headings" in SYSTEM_PROMPT.lower() or "# " in SYSTEM_PROMPT
+        assert "markdown headings" in INSTRUCTIONS.lower() or "# " in INSTRUCTIONS
 
     def test_no_format_specific_bias(self):
-        """Prompt should not contain SOAP-specific section names that bias output."""
-        assert "# Subjective" not in SYSTEM_PROMPT
-        assert "# Objective" not in SYSTEM_PROMPT
-        assert "# Assessment" not in SYSTEM_PROMPT
+        """Instructions should not contain SOAP-specific section names."""
+        assert "Subjective" not in INSTRUCTIONS
+        assert "Objective" not in INSTRUCTIONS
 
     def test_no_entity_tagging_instructions(self):
-        assert "{{drug:" not in SYSTEM_PROMPT
-        assert "{{condition:" not in SYSTEM_PROMPT
+        assert "{{drug:" not in INSTRUCTIONS
+        assert "{{condition:" not in INSTRUCTIONS
 
-    def test_transcript_fidelity_instruction(self):
-        assert "transcript" in SYSTEM_PROMPT.lower()
+    def test_references_transcript(self):
+        assert "transcript" in INSTRUCTIONS.lower()
 
-    def test_positive_phrasing(self):
-        """Prompt should use positive-only phrasing (no 'Do not' / 'Never')."""
-        assert "Do not" not in SYSTEM_PROMPT
-        assert "Never" not in SYSTEM_PROMPT
+    def test_uses_xml_tags(self):
+        assert "<instructions>" in INSTRUCTIONS
+        assert "</instructions>" in INSTRUCTIONS
+
+    def test_references_template_block(self):
+        assert "<template>" in INSTRUCTIONS
+
+
+class TestOneShotExample:
+    """Verify the 1-shot example demonstrates template adherence."""
+
+    def test_uses_xml_tags(self):
+        assert "<example>" in ONE_SHOT_EXAMPLE
+        assert "</example>" in ONE_SHOT_EXAMPLE
+
+    def test_shows_section_count_constraint(self):
+        assert "2 sections" in ONE_SHOT_EXAMPLE
+
+
+class TestTitlePrompt:
+    def test_title_prompt_exists(self):
+        assert len(TITLE_PROMPT) > 0
+
+    def test_title_prompt_word_limit(self):
+        assert "4 to 5 words" in TITLE_PROMPT or "4-5 words" in TITLE_PROMPT
