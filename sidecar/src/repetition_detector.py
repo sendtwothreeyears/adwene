@@ -13,9 +13,9 @@ from collections import Counter
 
 
 # -- Defaults (can be overridden per-instance) --------------------------------
-DEFAULT_NGRAM_SIZE = 4
-DEFAULT_MAX_OCCURRENCES = 3
-DEFAULT_WINDOW_WORDS = 150
+DEFAULT_NGRAM_SIZE = 5
+DEFAULT_MAX_OCCURRENCES = 4
+DEFAULT_WINDOW_WORDS = 250
 
 
 class RepetitionDetector:
