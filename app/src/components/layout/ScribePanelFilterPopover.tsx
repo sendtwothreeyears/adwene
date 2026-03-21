@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Calendar, ChevronRight, User } from "lucide-react";
+import { Calendar, ChevronRight, User, Check } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
+import type { Patient } from "../../types";
 
 export type DateFilter =
   | { type: "all" }
@@ -18,16 +19,23 @@ const DATE_PRESETS: { label: string; days: number }[] = [
 interface Props {
   dateFilter: DateFilter;
   onDateFilterChange: (filter: DateFilter) => void;
+  patients: Record<string, Patient>;
+  patientFilter: Set<string>;
+  onPatientFilterChange: (filter: Set<string>) => void;
   onClose: () => void;
 }
 
 export default function ScribePanelFilterPopover({
   dateFilter,
   onDateFilterChange,
+  patients,
+  patientFilter,
+  onPatientFilterChange,
   onClose,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const [showDateMenu, setShowDateMenu] = useState(false);
+  const [showPatientMenu, setShowPatientMenu] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [rangeStart, setRangeStart] = useState<Date | undefined>(
     dateFilter.type === "custom" ? dateFilter.start : undefined
@@ -150,15 +158,75 @@ export default function ScribePanelFilterPopover({
         )}
       </div>
 
-      {/* Patient profile filter — placeholder for KAS-323 */}
-      <button
-        className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50"
-        disabled
-      >
-        <User className="h-4 w-4 shrink-0" />
-        <span className="flex-1 text-left">Patient profile</span>
-        <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
-      </button>
+      {/* Patient profile filter */}
+      <div className="relative">
+        <button
+          onClick={() => {
+            setShowPatientMenu((v) => !v);
+            setShowDateMenu(false);
+            setShowCalendar(false);
+          }}
+          className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-gray-50 ${
+            patientFilter.size > 0
+              ? "text-gray-900 font-medium"
+              : "text-gray-700"
+          }`}
+        >
+          <User className="h-4 w-4 shrink-0" />
+          <span className="flex-1 text-left">Patient profile</span>
+          <ChevronRight className="h-3.5 w-3.5 text-gray-400" />
+        </button>
+
+        {showPatientMenu && (
+          <div className="absolute left-full top-0 ml-1 max-h-64 w-52 overflow-y-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+            {Object.values(patients).length === 0 ? (
+              <p className="px-3 py-2 text-xs text-gray-400">
+                No patients found
+              </p>
+            ) : (
+              Object.values(patients)
+                .sort((a, b) =>
+                  `${a.firstName} ${a.lastName}`.localeCompare(
+                    `${b.firstName} ${b.lastName}`
+                  )
+                )
+                .map((patient) => {
+                  const isSelected = patientFilter.has(patient.id);
+                  return (
+                    <button
+                      key={patient.id}
+                      onClick={() => {
+                        const next = new Set(patientFilter);
+                        if (isSelected) {
+                          next.delete(patient.id);
+                        } else {
+                          next.add(patient.id);
+                        }
+                        onPatientFilterChange(next);
+                      }}
+                      className={`flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-gray-50 ${
+                        isSelected
+                          ? "bg-primary/5 text-gray-900"
+                          : "text-gray-700"
+                      }`}
+                    >
+                      <span
+                        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                          isSelected
+                            ? "border-primary bg-primary text-white"
+                            : "border-gray-300"
+                        }`}
+                      >
+                        {isSelected && <Check className="h-3 w-3" />}
+                      </span>
+                      {patient.firstName} {patient.lastName}
+                    </button>
+                  );
+                })
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

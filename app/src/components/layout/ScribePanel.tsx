@@ -62,6 +62,7 @@ export default function ScribePanel() {
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [showSortPopover, setShowSortPopover] = useState(false);
   const [dateFilter, setDateFilter] = useState<DateFilter>({ type: "all" });
+  const [patientFilter, setPatientFilter] = useState<Set<string>>(new Set());
   const [showFilterPopover, setShowFilterPopover] = useState(false);
 
   const selectionMode = selectedIds.size > 0;
@@ -116,6 +117,13 @@ export default function ScribePanel() {
       });
     }
 
+    // Apply patient filter
+    if (patientFilter.size > 0) {
+      result = result.filter(
+        (s) => s.patientId !== null && patientFilter.has(s.patientId)
+      );
+    }
+
     // Apply search
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -132,7 +140,7 @@ export default function ScribePanel() {
     }
 
     return result;
-  }, [sessions, patients, search, dateFilter]);
+  }, [sessions, patients, search, dateFilter, patientFilter]);
 
   // Sort filtered sessions
   const sorted = useMemo(() => {
@@ -262,7 +270,7 @@ export default function ScribePanel() {
           <button
             onClick={() => setShowFilterPopover((v) => !v)}
             className={`rounded-md p-1.5 transition-colors ${
-              showFilterPopover || dateFilter.type !== "all"
+              showFilterPopover || dateFilter.type !== "all" || patientFilter.size > 0
                 ? "bg-gray-100 text-gray-700"
                 : "text-gray-500 hover:bg-gray-100 hover:text-gray-700"
             }`}
@@ -274,6 +282,9 @@ export default function ScribePanel() {
             <ScribePanelFilterPopover
               dateFilter={dateFilter}
               onDateFilterChange={setDateFilter}
+              patients={patients}
+              patientFilter={patientFilter}
+              onPatientFilterChange={setPatientFilter}
               onClose={() => setShowFilterPopover(false)}
             />
           )}
