@@ -236,14 +236,14 @@ export default function TemplatesView() {
       {!loading && favouriteTemplates.length > 0 && (
         <div className="mb-5">
           <h2 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">Favourites</h2>
-          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6">
+          <div className="flex flex-wrap gap-3">
             {favouriteTemplates.map((template) => (
               <button
                 key={template.id}
                 onClick={() => setEditingTemplate(template)}
-                className="flex aspect-square flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-3 text-center shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                className="flex h-24 w-24 flex-col items-center justify-center rounded-xl border border-gray-200 bg-white p-2 text-center shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
               >
-                <span className="line-clamp-3 text-xs font-medium text-gray-700">{template.name}</span>
+                <span className="line-clamp-3 text-[11px] font-medium leading-tight text-gray-700">{template.name}</span>
               </button>
             ))}
           </div>
