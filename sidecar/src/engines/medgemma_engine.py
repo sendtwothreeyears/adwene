@@ -1,4 +1,4 @@
-"""MedGemma 1.5-4B note generation engine — transcript to SOAP note via mlx-vlm."""
+"""MedGemma 1.5-4B note generation engine — transcript to clinical note via mlx-vlm."""
 
 import asyncio
 import logging
@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 import mlx.core as mx
 
 from .. import config
-from ..prompts import TITLE_PROMPT, build_note_prompt, estimate_max_tokens, strip_model_artifacts
+from ..prompts import TITLE_PROMPT, _STOP_PATTERNS, build_note_prompt, estimate_max_tokens, strip_model_artifacts
 from .base import NoteEngine
 
 logger = logging.getLogger("kasamd-sidecar")
@@ -163,7 +163,6 @@ class MedGemmaEngine(NoteEngine):
                 chunk = decoded[len(prev_text):]
                 if chunk:
                     # Check for Gemma control tokens leaking through
-                    from ..prompts import _STOP_PATTERNS
                     stop_match = _STOP_PATTERNS.search(chunk)
                     if stop_match:
                         # Send only the text before the control token
@@ -225,6 +224,8 @@ class MedGemmaEngine(NoteEngine):
 
         prompt = self._format_prompt(messages)
 
+        eos_token_ids = getattr(self._model.config, "eos_token_id", [1, 106])
+
         result = generate(
             self._model,
             self._processor,
@@ -233,9 +234,10 @@ class MedGemmaEngine(NoteEngine):
             verbose=False,
             temperature=config.MEDGEMMA_TEMPERATURE,
             top_p=config.MEDGEMMA_TOP_P,
+            eos_tokens=eos_token_ids,
         )
         mx.synchronize()  # Flush Metal command buffers before releasing executor
-        return result.text
+        return strip_model_artifacts(result.text)
 
     async def unload(self) -> None:
         self._model = None
