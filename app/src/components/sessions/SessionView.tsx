@@ -105,8 +105,7 @@ export default function SessionView() {
   const setActiveSession = useAppStore((s) => s.setActiveSession);
   const mergeActiveSession = useAppStore((s) => s.mergeActiveSession);
   const providerId = useAppStore((s) => s.providerId);
-  const showEntityHighlights = useAppStore((s) => s.showEntityHighlights);
-  const toggleEntityHighlights = useAppStore((s) => s.toggleEntityHighlights);
+  // Entity highlights disabled (KAS-395) — always apply entity-highlights-off class
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [activeTab, setActiveTab] = useState<SessionTab>("context");
@@ -1138,7 +1137,7 @@ export default function SessionView() {
         </div>
       )}
 
-      <div className={`min-h-0 flex-1 pt-2${!showEntityHighlights ? " entity-highlights-off" : ""}`}>
+      <div className="min-h-0 flex-1 pt-2 entity-highlights-off">
         {noteLoading && getNoteId(activeTab) !== null ? (
           <div className="flex items-center justify-center py-16 text-sm text-gray-400">
             Loading note...
@@ -1213,8 +1212,6 @@ export default function SessionView() {
                         }
                       }}
                       onExportPDF={handleExportPDF}
-                      showEntityHighlights={showEntityHighlights}
-                      onToggleEntityHighlights={toggleEntityHighlights}
                       onCopy={() => {
                         if (!activeNoteContent) return;
                         try {
