@@ -25,7 +25,11 @@ MEDGEMMA_TEMPERATURE: float = float(os.getenv("MEDGEMMA_TEMPERATURE", "0.35"))
 MEDGEMMA_REPETITION_PENALTY: float = float(os.getenv("MEDGEMMA_REPETITION_PENALTY", "1.05"))
 MEDGEMMA_REPETITION_CONTEXT_SIZE: int = int(os.getenv("MEDGEMMA_REPETITION_CONTEXT_SIZE", "128"))
 MEDGEMMA_TOP_P: float = float(os.getenv("MEDGEMMA_TOP_P", "0.65"))
-MEDGEMMA_MAX_TOKENS: int = int(os.getenv("MEDGEMMA_MAX_TOKENS", "1500"))
+MEDGEMMA_MAX_TOKENS: int = int(os.getenv("MEDGEMMA_MAX_TOKENS", "2048"))
+
+# -- Prompt format toggle --
+# "training" = exact fine-tuning format; "legacy" = old XML-style prompt
+PROMPT_FORMAT: str = os.environ.get("PROMPT_FORMAT", "training")
 
 # -- Repetition detector parameters --
 REPETITION_NGRAM_SIZE: int = int(os.getenv("REPETITION_NGRAM_SIZE", "5"))

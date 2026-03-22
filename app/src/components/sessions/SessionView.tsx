@@ -31,8 +31,14 @@ import { copyFile, mkdir, remove, stat, writeFile } from "@tauri-apps/plugin-fs"
 import { openPath } from "@tauri-apps/plugin-opener";
 import { appDataDir } from "@tauri-apps/api/path";
 
-/** Extract plain text from a serialized Lexical editor state. */
-function extractTextFromLexical(state: SerializedEditorState): string {
+/** Extract plain text from a serialized Lexical editor state.
+ *  When opts.markdown is true, heading nodes emit markdown `#`/`##`/`###`
+ *  prefixes and bold-only short paragraphs emit `## ` (custom template fallback). */
+function extractTextFromLexical(
+  state: SerializedEditorState,
+  opts?: { markdown?: boolean },
+): string {
+  const md = opts?.markdown === true;
   const lines: string[] = [];
   function walk(node: Record<string, unknown>) {
     if (node.type === "text" && typeof node.text === "string") {
@@ -45,6 +51,30 @@ function extractTextFromLexical(state: SerializedEditorState): string {
       if (lines.length > 0 && lines[lines.length - 1] !== "\n") lines.push("\n");
     }
     if (Array.isArray(node.children)) {
+      // Markdown heading prefix for heading nodes
+      if (md && node.type === "heading" && typeof node.tag === "string") {
+        const level = parseInt(node.tag.replace("h", ""), 10);
+        if (level >= 1 && level <= 6) {
+          lines.push("#".repeat(level) + " ");
+        }
+      }
+      // Markdown heading fallback: bold-only short paragraph → ## prefix
+      if (
+        md &&
+        node.type === "paragraph" &&
+        node.children.length === 1
+      ) {
+        const child = node.children[0] as Record<string, unknown>;
+        if (
+          child.type === "text" &&
+          typeof child.text === "string" &&
+          typeof child.format === "number" &&
+          (child.format & 1) !== 0 &&
+          child.text.length <= 60
+        ) {
+          lines.push("## ");
+        }
+      }
       for (const child of node.children) walk(child as Record<string, unknown>);
       if (node.type === "paragraph" || node.type === "heading") lines.push("\n");
     }
@@ -346,7 +376,7 @@ export default function SessionView() {
     const tmpl = templates.find((t) => t.id === selectedTemplateId);
     if (!tmpl?.content) return "";
     try {
-      return extractTextFromLexical(tmpl.content as SerializedEditorState);
+      return extractTextFromLexical(tmpl.content as SerializedEditorState, { markdown: true });
     } catch {
       return "";
     }
@@ -359,7 +389,7 @@ export default function SessionView() {
     const tmpl = templates.find((t) => t.id === noteTab.templateId);
     if (!tmpl?.content) return "";
     try {
-      return extractTextFromLexical(tmpl.content as SerializedEditorState);
+      return extractTextFromLexical(tmpl.content as SerializedEditorState, { markdown: true });
     } catch {
       return "";
     }
@@ -719,7 +749,7 @@ export default function SessionView() {
       if (transcript) {
         resetSmooth();
         wasStreamingRef.current = false;
-        const templateText = extractTextFromLexical(tmpl.content as SerializedEditorState);
+        const templateText = extractTextFromLexical(tmpl.content as SerializedEditorState, { markdown: true });
         generateNote(activeSession.id, note.id, transcript, templateText, getContextText());
       }
     } catch (err) {
@@ -1167,7 +1197,7 @@ export default function SessionView() {
                           if (transcript) {
                             let templateText = "";
                             if (tmpl?.content) {
-                              try { templateText = extractTextFromLexical(tmpl.content as SerializedEditorState); } catch { /* ignore */ }
+                              try { templateText = extractTextFromLexical(tmpl.content as SerializedEditorState, { markdown: true }); } catch { /* ignore */ }
                             }
                             generateNote(activeSession.id, nid, transcript, templateText, getContextText());
                           }

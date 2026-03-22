@@ -236,12 +236,12 @@ export default function TemplatesView() {
       {!loading && favouriteTemplates.length > 0 && (
         <div className="mb-8">
           <h2 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">Favourites</h2>
-          <div className="flex flex-wrap gap-3">
+          <div className="flex gap-3 overflow-x-auto pb-4">
             {favouriteTemplates.map((template) => (
               <div
                 key={template.id}
                 onClick={() => setEditingTemplate(template)}
-                className="flex h-20 w-36 cursor-pointer flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                className="flex h-20 w-36 shrink-0 cursor-pointer flex-col justify-between rounded-xl border border-gray-200 bg-white p-3 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
               >
                 <span className="line-clamp-2 text-xs font-medium leading-tight text-gray-700">{template.name}</span>
                 <div className="flex justify-end">

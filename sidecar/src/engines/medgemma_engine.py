@@ -7,13 +7,13 @@ from collections.abc import AsyncIterator
 import mlx.core as mx
 
 from .. import config
-from ..prompts import TITLE_PROMPT, _STOP_PATTERNS, build_note_prompt, estimate_max_tokens, strip_model_artifacts
+from ..prompts import TITLE_PROMPT, _STOP_PATTERNS, build_note_prompt, strip_model_artifacts
 from .base import NoteEngine
 
 logger = logging.getLogger("kasamd-sidecar")
 
 # Maximum time (seconds) for a single generate() call before we abort.
-GENERATE_TIMEOUT_S = 120
+GENERATE_TIMEOUT_S = 180
 
 
 class MedGemmaEngine(NoteEngine):
@@ -43,14 +43,14 @@ class MedGemmaEngine(NoteEngine):
             self._processor, model_config, messages, num_images=0
         )
 
-    async def generate(self, transcript: str, template: str) -> str:
+    async def generate(self, transcript: str, template: str, context: str = "") -> str:
         if self._model is None:
             raise RuntimeError("MedGemma engine not loaded — call load() first")
 
         loop = asyncio.get_running_loop()
         from ..server import _mlx_executor
         return await asyncio.wait_for(
-            loop.run_in_executor(_mlx_executor, self._generate_sync, transcript, template),
+            loop.run_in_executor(_mlx_executor, self._generate_sync, transcript, template, context),
             timeout=GENERATE_TIMEOUT_S,
         )
 
@@ -61,7 +61,7 @@ class MedGemmaEngine(NoteEngine):
         messages = [{"role": "user", "content": prompt_text}]
         prompt = self._format_prompt(messages)
 
-        max_tokens = estimate_max_tokens(template) if template else config.MEDGEMMA_MAX_TOKENS
+        max_tokens = config.MEDGEMMA_MAX_TOKENS
 
         # Reset stopping criteria so generate() stops at EOS tokens
         tokenizer = self._processor.tokenizer if hasattr(self._processor, "tokenizer") else self._processor
@@ -111,7 +111,7 @@ class MedGemmaEngine(NoteEngine):
         messages = [{"role": "user", "content": prompt_text}]
         prompt = self._format_prompt(messages)
 
-        max_tokens = estimate_max_tokens(template) if template else config.MEDGEMMA_MAX_TOKENS
+        max_tokens = config.MEDGEMMA_MAX_TOKENS
 
         # stream_generate is synchronous generator — run in executor with a
         # queue to bridge to async.  A sentinel of None means "done";

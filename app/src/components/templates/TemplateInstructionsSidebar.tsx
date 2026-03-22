@@ -9,11 +9,13 @@ export default function TemplateInstructionsSidebar({
 }: TemplateInstructionsSidebarProps) {
   return (
     <div
-      className={`border-l border-gray-200 bg-gradient-to-b from-gray-50 to-white overflow-hidden transition-all duration-300 z-10 ${
-        isOpen ? "w-[420px]" : "w-0"
-      }`}
+      className="bg-gray-50 border-l border-gray-200 z-10 overflow-hidden"
+      style={{
+        width: isOpen ? 420 : 0,
+        transition: "width 300ms ease-in-out",
+      }}
     >
-      <div className="flex h-full w-[420px] flex-col">
+      <div className="flex h-full flex-col" style={{ minWidth: 420, width: 420 }}>
         {/* Header with close button */}
         <div className="p-4 pb-4">
           <button
@@ -43,7 +45,7 @@ export default function TemplateInstructionsSidebar({
         <div className="flex-1 overflow-auto p-6">
           <div className="space-y-6">
             {/* Section Headings */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 py-3">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50">
                 <svg
                   width="20"
@@ -59,21 +61,22 @@ export default function TemplateInstructionsSidebar({
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="mb-1.5 font-semibold text-gray-900">
-                  Section Headings
+                  Bold Text = Section Headings
                 </h3>
                 <p className="mb-3 text-sm leading-relaxed text-gray-600">
-                  Use simple text headings to structure your template
+                  Bold lines become section headings in the generated note. Use
+                  them to define the structure of your template.
                 </p>
                 <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
                   <code className="font-mono text-xs text-gray-700">
-                    Chief Complaint
+                    <strong>Chief Complaint</strong>
                   </code>
                 </div>
               </div>
             </div>
 
             {/* Dynamic Fields */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 py-3">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-purple-50">
                 <svg
                   width="20"
@@ -92,61 +95,22 @@ export default function TemplateInstructionsSidebar({
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="mb-1.5 font-semibold text-gray-900">
-                  Dynamic Fields
+                  [Brackets] = Placeholders
                 </h3>
                 <p className="mb-3 text-sm leading-relaxed text-gray-600">
-                  Use{" "}
-                  <span className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
-                    [brackets]
-                  </span>{" "}
-                  for content from transcription
+                  The AI replaces bracketed text with actual information from the
+                  patient encounter transcript.
                 </p>
                 <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
                   <code className="font-mono text-xs text-gray-700">
-                    [Patient&apos;s current medications]
-                  </code>
-                </div>
-              </div>
-            </div>
-
-            {/* Fixed Text */}
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-green-50">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="text-green-600"
-                >
-                  <path d="M10 10.5L12 12.5L14 10.5" />
-                  <path d="M10 14.5L12 16.5L14 14.5" />
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="mb-1.5 font-semibold text-gray-900">
-                  Fixed Text
-                </h3>
-                <p className="mb-3 text-sm leading-relaxed text-gray-600">
-                  Use{" "}
-                  <span className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
-                    &quot;quotes&quot;
-                  </span>{" "}
-                  for text to include verbatim
-                </p>
-                <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
-                  <code className="font-mono text-xs text-gray-700">
-                    &quot;Electronically signed by Dr. Smith&quot;
+                    [Patient&apos;s primary reason for visit]
                   </code>
                 </div>
               </div>
             </div>
 
             {/* AI Instructions */}
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 py-3">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-amber-50">
                 <svg
                   width="20"
@@ -166,20 +130,90 @@ export default function TemplateInstructionsSidebar({
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="mb-1.5 font-semibold text-gray-900">
-                  AI Instructions
+                  (Parentheses) = AI Instructions
                 </h3>
                 <p className="mb-3 text-sm leading-relaxed text-gray-600">
-                  Add{" "}
-                  <span className="rounded bg-gray-100 px-1 py-0.5 font-mono text-xs">
-                    (guidance)
-                  </span>{" "}
-                  to control AI behavior
+                  Parenthesized text guides the AI&apos;s behavior but is
+                  stripped from the final note. Use these to control what the AI
+                  includes or omits.
                 </p>
                 <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
                   <code className="font-mono text-xs text-gray-700">
-                    (Include only if symptoms mentioned)
+                    (Only include systems that were discussed)
                   </code>
                 </div>
+              </div>
+            </div>
+
+            {/* Example: Before & After */}
+            <div className="border-t border-gray-200 pt-5">
+              <h3 className="mb-3 font-semibold text-gray-900">
+                Example: Template to Note
+              </h3>
+
+              {/* Template input */}
+              <p className="mb-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
+                Template
+              </p>
+              <div className="mb-4 rounded-md border border-gray-200 bg-white px-3 py-2.5 space-y-1">
+                <p className="font-mono text-xs text-gray-700">
+                  <strong>Review of Systems</strong>
+                </p>
+                <p className="font-mono text-xs text-gray-700">
+                  (Only include systems that were discussed)
+                </p>
+                <p className="font-mono text-xs text-gray-700">
+                  [Relevant positive and negative findings by system]
+                </p>
+              </div>
+
+              {/* Arrow */}
+              <div className="mb-4 flex justify-center text-gray-400">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <polyline points="19 12 12 19 5 12" />
+                </svg>
+              </div>
+
+              {/* Generated output */}
+              <p className="mb-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
+                Generated Note
+              </p>
+              <div className="rounded-md border border-gray-200 bg-white px-3 py-2.5 space-y-1">
+                <p className="font-mono text-xs font-semibold text-gray-700">
+                  Review of Systems
+                </p>
+                <p className="font-mono text-xs text-gray-700">
+                  Constitutional: No fever, no weight loss
+                </p>
+                <p className="font-mono text-xs text-gray-700">
+                  Cardiovascular: Denies chest pain or palpitations
+                </p>
+              </div>
+
+              {/* Legend */}
+              <div className="mt-3 space-y-1">
+                <p className="text-xs text-gray-500">
+                  <span className="font-medium text-blue-600">Bold</span>
+                  {" "}became the section heading
+                </p>
+                <p className="text-xs text-gray-500">
+                  <span className="font-medium text-amber-600">(Parentheses)</span>
+                  {" "}were followed then removed
+                </p>
+                <p className="text-xs text-gray-500">
+                  <span className="font-medium text-purple-600">[Brackets]</span>
+                  {" "}were replaced with transcript content
+                </p>
               </div>
             </div>
           </div>
