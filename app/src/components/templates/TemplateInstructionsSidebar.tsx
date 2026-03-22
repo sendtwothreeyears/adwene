@@ -42,7 +42,7 @@ export default function TemplateInstructionsSidebar({
         </div>
 
         {/* Helper content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto scrollbar-hide p-6">
           <div className="space-y-6">
             {/* Section Headings */}
             <div className="flex items-start gap-3 py-3">

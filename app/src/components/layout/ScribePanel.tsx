@@ -331,7 +331,7 @@ export default function ScribePanel() {
       </div>
 
       {/* Session list */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
         {loading ? (
           <p className="py-8 text-center text-xs text-gray-400">Loading...</p>
         ) : grouped.length === 0 ? (

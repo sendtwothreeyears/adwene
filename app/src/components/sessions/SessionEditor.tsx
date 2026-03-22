@@ -129,7 +129,7 @@ export default memo(function SessionEditor({
     }
   }
 
-  const editorClassName = "min-h-0 flex-1 overflow-auto px-4 py-3 text-base text-gray-900 outline-none font-fakt max-w-[800px]";
+  const editorClassName = "min-h-0 flex-1 overflow-auto scrollbar-hide px-4 py-3 text-base text-gray-900 outline-none font-fakt max-w-[800px]";
   const placeholderEl = (
     <div className="pointer-events-none absolute top-0 left-0 px-4 py-3 text-base text-gray-400">
       {placeholder}

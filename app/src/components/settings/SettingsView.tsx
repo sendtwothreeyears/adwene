@@ -13,7 +13,7 @@ export default function SettingsView() {
         Settings
       </h1>
       <SettingsTabBar activeTab={activeTab} onTabChange={setActiveTab} />
-      <div className="mt-6 flex-1 overflow-y-auto">
+      <div className="mt-6 flex-1 overflow-y-auto scrollbar-hide">
         {activeTab === "note" && <NoteSettingsPane />}
         {activeTab === "transcription" && <TranscriptionSettingsPane />}
         {activeTab === "account" && <AccountSettingsPane />}

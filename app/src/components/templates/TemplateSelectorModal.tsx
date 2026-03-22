@@ -91,7 +91,7 @@ export default function TemplateSelectorModal({
         />
       </div>
 
-      <div className="max-h-[400px] overflow-y-auto -mx-2">
+      <div className="max-h-[400px] overflow-y-auto scrollbar-hide -mx-2">
         {/* None option */}
         <button
           type="button"

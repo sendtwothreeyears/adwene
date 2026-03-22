@@ -120,7 +120,7 @@ export default function TemplateModal({
       </div>
 
       {/* Editor — scrolls */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-4">
         <TemplateEditor
           initialState={
             (template?.content as SerializedEditorState) ?? null

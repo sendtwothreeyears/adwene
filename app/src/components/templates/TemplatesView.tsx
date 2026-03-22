@@ -236,7 +236,7 @@ export default function TemplatesView() {
       {!loading && favouriteTemplates.length > 0 && (
         <div className="mb-8">
           <h2 className="mb-3 text-sm font-semibold text-gray-500 uppercase tracking-wide">Favourites</h2>
-          <div className="flex gap-3 overflow-x-auto pb-4">
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-4">
             {favouriteTemplates.map((template) => (
               <div
                 key={template.id}
@@ -335,7 +335,7 @@ export default function TemplatesView() {
           No templates match your search.
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg bg-white">
+        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide rounded-lg bg-white">
           <table className="w-full">
             <thead className="sticky top-0 bg-white">
               <tr className="border-b border-gray-200 text-left text-xs font-medium text-gray-500">
