@@ -123,8 +123,23 @@ export default function SessionView() {
   const [showQuickPatient, setShowQuickPatient] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error"; visible: boolean }>({ message: "", variant: "success", visible: false });
   const [noteTabs, setNoteTabs] = useState<SessionNoteTab[]>([]);
-  /** Lexical JSON for the currently active note tab (loaded from session_notes). */
-  const [activeNoteContent, setActiveNoteContent] = useState<SerializedEditorState | null>(null);
+  /** Lexical JSON cache keyed by noteId — each tab's content is independent. */
+  const [noteContentCache, setNoteContentCache] = useState<Map<string, SerializedEditorState>>(new Map());
+  /** Convenience getter for the current tab's note content. */
+  const currentNoteId = getNoteId(activeTab);
+  const activeNoteContent = currentNoteId ? noteContentCache.get(currentNoteId) ?? null : null;
+  /** Update a specific note's content in the cache. */
+  const setNoteContent = useCallback((noteId: string, content: SerializedEditorState | null) => {
+    setNoteContentCache((prev) => {
+      const next = new Map(prev);
+      if (content) {
+        next.set(noteId, content);
+      } else {
+        next.delete(noteId);
+      }
+      return next;
+    });
+  }, []);
   const [showAddNoteModal, setShowAddNoteModal] = useState(false);
   const [noteLoading, setNoteLoading] = useState(false);
   const [confirmDeleteNote, setConfirmDeleteNote] = useState<string | null>(null);
@@ -222,7 +237,7 @@ export default function SessionView() {
     setStreamPreview(null);
     setConfirmRegenerate(false);
     setConfirmDelete(false);
-    setActiveNoteContent(null);
+    setNoteContentCache(new Map());
     resetTranscription();
   }, [activeSession?.id, resetTranscription]);
 
@@ -300,24 +315,23 @@ export default function SessionView() {
 
     const nid = getNoteId(activeTab);
     if (!nid) {
-      setActiveNoteContent(null);
       setNoteLoading(false);
       return;
     }
-    // Clear immediately to prevent stale content from the previous tab being displayed
-    // while the async DB load is in progress.
-    setActiveNoteContent(null);
+    // If we already have cached content for this note, skip the DB load
+    if (noteContentCache.has(nid)) {
+      setNoteLoading(false);
+      return;
+    }
     setNoteLoading(true);
     (async () => {
       try {
         const note = await db.getSessionNote(nid);
         if (note?.content) {
-          setActiveNoteContent(typeof note.content === "string" ? JSON.parse(note.content) : note.content);
-        } else {
-          setActiveNoteContent(null);
+          setNoteContent(nid, typeof note.content === "string" ? JSON.parse(note.content) : note.content);
         }
       } catch {
-        setActiveNoteContent(null);
+        // ignore
       } finally {
         setNoteLoading(false);
       }
@@ -564,11 +578,8 @@ export default function SessionView() {
             ? markdownToLexical(content)
             : (content as SerializedEditorState);
 
-        // Update display IMMEDIATELY so there's no gap between streaming ending
-        // and the final content appearing. The DB write can happen after.
-        if (getNoteId(activeTab) === noteId) {
-          setActiveNoteContent(lexicalState);
-        }
+        // Update the cache for this specific note — works regardless of which tab is active.
+        setNoteContent(noteId, lexicalState);
         // Persist to session_notes table
         await db.updateSessionNote(noteId, JSON.stringify(lexicalState));
 
@@ -700,7 +711,7 @@ export default function SessionView() {
           pendingSaveRef.current = null;
           try {
             await db.updateSessionNote(nid, JSON.stringify(state));
-            setActiveNoteContent(state);
+            setNoteContent(nid, state);
           } catch (err) {
             console.error(`Failed to save note ${nid}:`, err);
           }
@@ -747,8 +758,6 @@ export default function SessionView() {
       });
       const newTab: SessionNoteTab = { id: note.id, templateId: tmpl.id, templateName: note.templateName };
       setNoteTabs((prev) => [...prev, newTab]);
-      // Clear stale content before tab switch so the first render is clean
-      setActiveNoteContent(null);
       setNoteLoading(true);
       setStreamPreview(null);
       setActiveTab(`note:${note.id}`);
@@ -806,17 +815,17 @@ export default function SessionView() {
           setNoteTabs([newTab]);
           setActiveTab(`note:${note.id}`);
           setSelectedTemplateId(templateId);
-          setActiveNoteContent(null);
+          setNoteContent(noteId, null);
         } else {
           setNoteTabs([]);
           setActiveTab("context");
-          setActiveNoteContent(null);
+          setNoteContentCache(new Map());
         }
       } else {
         setNoteTabs((prev) => prev.filter((t) => t.id !== noteId));
+        setNoteContent(noteId, null);
         if (getNoteId(activeTab) === noteId) {
           setActiveTab("context");
-          setActiveNoteContent(null);
         }
       }
     } catch (err) {
@@ -844,7 +853,6 @@ export default function SessionView() {
 
   const field = getTabField(activeTab);
   // While streaming on the note tab, show the live preview; otherwise show persisted state
-  const currentNoteId = getNoteId(activeTab);
   const noteIsStreaming = currentNoteId !== null && isStreaming && activeNoteId === currentNoteId && streamPreview;
   const initialState = noteIsStreaming
     ? streamPreview
