@@ -2,16 +2,19 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Plus } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import * as db from "../../lib/db";
-import type { Patient, CreatePatientInput, UpdatePatientInput } from "../../types";
+import type { Patient, Session, CreatePatientInput, UpdatePatientInput } from "../../types";
 import Modal from "../ui/Modal";
 import SearchInput from "../ui/SearchInput";
 import PatientList from "./PatientList";
 import PatientForm from "./PatientForm";
+import PatientSlideOver from "./PatientSlideOver";
 
 export default function RecordsView() {
   const providerId = useAppStore((s) => s.providerId);
   const selectedPatient = useAppStore((s) => s.selectedPatient);
   const setSelectedPatient = useAppStore((s) => s.setSelectedPatient);
+  const setActiveSession = useAppStore((s) => s.setActiveSession);
+  const setView = useAppStore((s) => s.setView);
   const showPatientForm = useAppStore((s) => s.showPatientForm);
   const openPatientForm = useAppStore((s) => s.openPatientForm);
   const closePatientForm = useAppStore((s) => s.closePatientForm);
@@ -21,6 +24,10 @@ export default function RecordsView() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
+
+  // Session list for slide-over
+  const [patientSessions, setPatientSessions] = useState<Session[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   const loadPatients = useCallback(async () => {
     if (!providerId) return;
@@ -39,6 +46,27 @@ export default function RecordsView() {
   useEffect(() => {
     loadPatients();
   }, [loadPatients]);
+
+  // Load sessions when selected patient changes
+  useEffect(() => {
+    if (!selectedPatient) {
+      setPatientSessions([]);
+      return;
+    }
+    let cancelled = false;
+    setSessionsLoading(true);
+    db.listSessionsByPatient(selectedPatient.id)
+      .then((sessions) => {
+        if (!cancelled) setPatientSessions(sessions);
+      })
+      .catch(() => {
+        if (!cancelled) setPatientSessions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSessionsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedPatient?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
     if (!search.trim()) return patients;
@@ -87,11 +115,21 @@ export default function RecordsView() {
   ) {
     if ("id" in input) {
       await db.updatePatient(input.id, input.data);
+      // Refresh selectedPatient if it was the one being edited (stale-data fix)
+      if (selectedPatient && selectedPatient.id === input.id) {
+        const updated = await db.getPatient(input.id);
+        if (updated) setSelectedPatient(updated);
+      }
     } else {
       await db.createPatient(input);
     }
     handleCloseForm();
     await loadPatients();
+  }
+
+  function handleSessionSelect(session: Session) {
+    setActiveSession(session);
+    setView("session");
   }
 
   return (
@@ -121,14 +159,31 @@ export default function RecordsView() {
         />
       </div>
 
-      <PatientList
-        patients={filtered}
-        loading={loading}
-        selectedPatient={selectedPatient}
-        onSelect={setSelectedPatient}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-      />
+      {/* Split layout: patient list + slide-over */}
+      <div className="flex min-h-0 flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto scrollbar-hide">
+          <PatientList
+            patients={filtered}
+            loading={loading}
+            selectedPatient={selectedPatient}
+            onSelect={setSelectedPatient}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        </div>
+
+        {selectedPatient && (
+          <PatientSlideOver
+            patient={selectedPatient}
+            sessions={patientSessions}
+            sessionsLoading={sessionsLoading}
+            isOpen={!!selectedPatient}
+            onClose={() => setSelectedPatient(null)}
+            onEdit={handleEdit}
+            onSessionSelect={handleSessionSelect}
+          />
+        )}
+      </div>
 
       <Modal
         open={showPatientForm}
