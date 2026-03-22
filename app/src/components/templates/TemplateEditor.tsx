@@ -37,9 +37,9 @@ const EDITOR_THEME = {
   },
   paragraph: "my-1",
   heading: {
-    h1: "text-2xl font-bold my-2",
-    h2: "text-xl font-semibold my-2",
-    h3: "text-lg font-semibold my-1",
+    h1: "text-base font-semibold my-2",
+    h2: "text-base font-semibold my-2",
+    h3: "text-base font-semibold my-1",
   },
   quote: "border-l-4 border-gray-300 pl-4 italic text-gray-600 my-2",
   formatLeft: "text-left",
