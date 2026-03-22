@@ -328,6 +328,15 @@ export async function listSessions(providerId: string): Promise<Session[]> {
   return rows.map(parseSessionJson);
 }
 
+export async function listSessionsByPatient(patientId: string): Promise<Session[]> {
+  const db = await getDb();
+  const rows = await db.select<Session[]>(
+    "SELECT * FROM Session WHERE patientId = $1 ORDER BY createdAt DESC",
+    [patientId]
+  );
+  return rows.map(parseSessionJson);
+}
+
 export async function getSession(id: string): Promise<Session | null> {
   const db = await getDb();
   const rows = await db.select<Session[]>("SELECT * FROM Session WHERE id = $1", [id]);
