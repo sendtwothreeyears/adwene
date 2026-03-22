@@ -14,12 +14,14 @@ import { useRecordingTimer } from "../../hooks/useRecordingTimer";
 import { useTranscription } from "../../hooks/useTranscription";
 import { useNoteGeneration } from "../../hooks/useNoteGeneration";
 import { useSidecar } from "../../contexts/SidecarContext";
+import { useDictation } from "../../hooks/useDictation";
 import { useTextExtraction } from "../../hooks/useTextExtraction";
 import { usePdfExport } from "../../hooks/usePdfExport";
 import { useSmoothStream } from "../../hooks/useSmoothStream";
 import { getLiveTranscriptionEnabled } from "../settings/TranscriptionSettingsPane";
 import { markdownToLexical } from "../../lib/markdown-to-lexical";
 import { lexicalToHtml } from "../../lib/lexical-to-html";
+import DictationButton from "./dictation/DictationButton";
 import ContextAttachments, { type AttachmentWithStatus } from "./ContextAttachments";
 import QuickPatientModal from "../patients/QuickPatientModal";
 import TemplateSelectorModal from "../templates/TemplateSelectorModal";
@@ -191,6 +193,14 @@ export default function SessionView() {
   } = useNoteGeneration();
 
   const { connectionState, send, onMessage } = useSidecar();
+  const {
+    isDictating,
+    isProcessing: isDictationProcessing,
+    transcribedText,
+    startDictation,
+    stopDictation,
+    reset: resetDictation,
+  } = useDictation(selectedDeviceId);
   const { extractText } = useTextExtraction();
   const { generatePdf } = usePdfExport();
   const { smoothText, appendChunk, flush: flushSmooth, reset: resetSmooth } = useSmoothStream();
@@ -865,6 +875,13 @@ export default function SessionView() {
     (activeTab === "transcription" && !hasCompletedTranscript) ||
     (getNoteId(activeTab) !== null && (isStreaming || !hasCompletedTranscript));
 
+  const handleDictationComplete = useCallback(() => {
+    resetDictation();
+  }, [resetDictation]);
+
+  // Dictation is available on the transcription tab when the editor is editable
+  const canDictate = activeTab === "transcription" && hasCompletedTranscript && !isLiveTranscribing && sidecarConnected;
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (activeTab !== "context") return;
     e.preventDefault();
@@ -1149,6 +1166,8 @@ export default function SessionView() {
             onChange={isReadOnly ? undefined : handleEditorChange}
             readOnly={isReadOnly}
             streaming={!!noteIsStreaming}
+            dictation={canDictate ? { isDictating, isProcessing: isDictationProcessing, transcribedText } : undefined}
+            onDictationComplete={canDictate ? handleDictationComplete : undefined}
             placeholder={
               getNoteId(activeTab) !== null && !hasCompletedTranscript
                 ? "Create a transcription first to generate a note..."
@@ -1236,7 +1255,16 @@ export default function SessionView() {
                   )
                 : activeTab === "transcription"
                   ? (
-                    <div className="absolute top-3 right-4 z-10">
+                    <div className="absolute top-3 right-4 z-10 flex items-center gap-2">
+                      {canDictate && (
+                        <DictationButton
+                          isDictating={isDictating}
+                          isProcessing={isDictationProcessing}
+                          disabled={!canDictate}
+                          onStart={() => activeSession && startDictation(activeSession.id)}
+                          onStop={stopDictation}
+                        />
+                      )}
                       <button
                         type="button"
                         disabled={!activeSession.rawTranscript || transcriptCopied}

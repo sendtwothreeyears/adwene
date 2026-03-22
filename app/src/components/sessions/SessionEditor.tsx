@@ -19,8 +19,10 @@ import { HeadingNode, QuoteNode } from "@lexical/rich-text";
 import type { EditorState, SerializedEditorState } from "lexical";
 import { ClinicalEntityNode } from "../../lib/clinicalEntityNode";
 import FloatingToolbarPlugin from "../ui/FloatingToolbarPlugin";
+import { DictationNode } from "./dictation/DictationNode";
+import DictationPlugin from "./dictation/DictationPlugin";
 
-const EDITOR_NODES = [ListNode, ListItemNode, LinkNode, CodeNode, HeadingNode, QuoteNode, ClinicalEntityNode];
+const EDITOR_NODES = [ListNode, ListItemNode, LinkNode, CodeNode, HeadingNode, QuoteNode, ClinicalEntityNode, DictationNode];
 
 const EDITOR_THEME = {
   text: {
@@ -90,6 +92,12 @@ function StreamingStatePlugin({
   return null;
 }
 
+interface DictationState {
+  isDictating: boolean;
+  isProcessing: boolean;
+  transcribedText: string | null;
+}
+
 interface SessionEditorProps {
   /** Existing Lexical editor state to load (null for empty editor). */
   initialState: SerializedEditorState | null;
@@ -103,7 +111,15 @@ interface SessionEditorProps {
   header?: React.ReactNode;
   /** When true, update editor state on every prop change (for streaming preview). */
   streaming?: boolean;
+  /** Dictation state — when provided, DictationPlugin is mounted. */
+  dictation?: DictationState;
+  /** Called when dictation completes (text inserted or empty result). */
+  onDictationComplete?: () => void;
 }
+
+// No-op lock callback — editor stays editable during dictation.
+// The DictationNode itself is contentEditable="false" so it can't be broken.
+const NOOP_LOCK = () => {};
 
 export default memo(function SessionEditor({
   initialState,
@@ -112,6 +128,8 @@ export default memo(function SessionEditor({
   placeholder,
   header,
   streaming = false,
+  dictation,
+  onDictationComplete,
 }: SessionEditorProps) {
   const initialConfig = {
     namespace: "SessionEditor",
@@ -166,6 +184,15 @@ export default memo(function SessionEditor({
           <StreamingStatePlugin editorState={initialState} />
         ) : (
           <LoadStatePlugin editorState={initialState} />
+        )}
+        {dictation && onDictationComplete && (
+          <DictationPlugin
+            isDictating={dictation.isDictating}
+            isProcessing={dictation.isProcessing}
+            transcribedText={dictation.transcribedText}
+            onDictationComplete={onDictationComplete}
+            onLockChange={NOOP_LOCK}
+          />
         )}
       </div>
     </LexicalComposer>
