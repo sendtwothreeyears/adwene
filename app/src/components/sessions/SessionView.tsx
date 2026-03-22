@@ -122,6 +122,7 @@ export default function SessionView() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [showQuickPatient, setShowQuickPatient] = useState(false);
   const [toast, setToast] = useState<{ message: string; variant: "success" | "error"; visible: boolean }>({ message: "", variant: "success", visible: false });
+  const [transcriptCopied, setTranscriptCopied] = useState(false);
   const [noteTabs, setNoteTabs] = useState<SessionNoteTab[]>([]);
   /** Lexical JSON cache keyed by noteId — each tab's content is independent. */
   const [noteContentCache, setNoteContentCache] = useState<Map<string, SerializedEditorState>>(new Map());
@@ -1235,6 +1236,40 @@ export default function SessionView() {
                         if (nid) setConfirmDeleteNote(nid);
                       }}
                     />
+                  )
+                : activeTab === "transcription"
+                  ? (
+                    <div className="flex justify-end px-4 pt-3">
+                      <button
+                        type="button"
+                        disabled={!activeSession.rawTranscript || transcriptCopied}
+                        onClick={() => {
+                          try {
+                            const transcript = activeSession.transcript as SerializedEditorState | null;
+                            const text = transcript
+                              ? extractTextFromLexical(transcript)
+                              : (activeSession.rawTranscript ?? "");
+                            if (!text) return;
+                            navigator.clipboard.writeText(text);
+                            setTranscriptCopied(true);
+                            setTimeout(() => setTranscriptCopied(false), 2000);
+                          } catch (err) {
+                            console.error("Failed to copy transcript:", err);
+                          }
+                        }}
+                        className="flex items-center gap-2 rounded-lg border border-border bg-white px-4 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                          />
+                        </svg>
+                        {transcriptCopied ? "Copied" : "Copy"}
+                      </button>
+                    </div>
                   )
                 : undefined
             }
