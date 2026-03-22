@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { getAudioGain } from "../lib/audioGain";
 
 type CaptureState = "idle" | "recording" | "error";
 
@@ -37,11 +38,21 @@ export function useAudioCapture(
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
+  const compressorNodeRef = useRef<DynamicsCompressorNode | null>(null);
 
   const cleanup = useCallback(() => {
     if (sourceNodeRef.current) {
       sourceNodeRef.current.disconnect();
       sourceNodeRef.current = null;
+    }
+    if (gainNodeRef.current) {
+      gainNodeRef.current.disconnect();
+      gainNodeRef.current = null;
+    }
+    if (compressorNodeRef.current) {
+      compressorNodeRef.current.disconnect();
+      compressorNodeRef.current = null;
     }
     if (workletNodeRef.current) {
       workletNodeRef.current.disconnect();
@@ -59,13 +70,17 @@ export function useAudioCapture(
   }, []);
 
   const buildAudioConstraints = useCallback(
-    (deviceId?: string | null) => ({
-      ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-      echoCancellation: false,
-      noiseSuppression: false,
-      autoGainControl: true,
-      channelCount: 1,
-    }),
+    (deviceId?: string | null) => {
+      // Read gain from localStorage directly (not React state) to keep [] deps valid
+      const gain = getAudioGain();
+      return {
+        ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: gain > 1.0 ? false : true,
+        channelCount: 1,
+      };
+    },
     []
   );
 
@@ -96,12 +111,29 @@ export function useAudioCapture(
 
       await audioContext.audioWorklet.addModule("/pcm-processor.js");
 
-      // Create worklet node and connect microphone
+      // Create worklet node
       const workletNode = new AudioWorkletNode(audioContext, "pcm-processor");
       workletNodeRef.current = workletNode;
 
+      // Create gain + compressor chain for user-controlled mic boost.
+      // Graph: source → gainNode → compressor → workletNode
+      const gain = getAudioGain();
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = gain;
+      gainNodeRef.current = gainNode;
+
+      const compressor = audioContext.createDynamicsCompressor();
+      compressor.threshold.value = -6;
+      compressor.knee.value = 12;
+      compressor.ratio.value = 12;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.1;
+      compressorNodeRef.current = compressor;
+
       const source = audioContext.createMediaStreamSource(stream);
-      source.connect(workletNode);
+      source.connect(gainNode);
+      gainNode.connect(compressor);
+      compressor.connect(workletNode);
       sourceNodeRef.current = source;
 
       // Listen for PCM chunks from the worklet
@@ -152,10 +184,12 @@ export function useAudioCapture(
           streamRef.current.getTracks().forEach((t) => t.stop());
         }
 
-        // Connect new source to the existing worklet — zero gap
+        // Connect new source to the existing gain chain — zero gap.
+        // The gainNode → compressor → workletNode chain persists from start().
         streamRef.current = newStream;
         const newSource = audioContext.createMediaStreamSource(newStream);
-        newSource.connect(workletNode);
+        const target = gainNodeRef.current ?? workletNode;
+        newSource.connect(target);
         sourceNodeRef.current = newSource;
 
         setError(null);

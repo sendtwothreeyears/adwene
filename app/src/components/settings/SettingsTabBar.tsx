@@ -1,4 +1,4 @@
-export type SettingsTab = "note" | "account";
+export type SettingsTab = "note" | "account" | "audio";
 
 interface SettingsTabBarProps {
   activeTab: SettingsTab;
@@ -8,6 +8,7 @@ interface SettingsTabBarProps {
 const tabs: { id: SettingsTab; label: string }[] = [
   { id: "note", label: "Note" },
   { id: "account", label: "Account" },
+  { id: "audio", label: "Audio" },
 ];
 
 export default function SettingsTabBar({
