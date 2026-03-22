@@ -548,6 +548,12 @@ export default function SessionView() {
     return () => clearInterval(id);
   }, [isStreaming]);
 
+  // Clear stale streamPreview when the user switches tabs so the next tab
+  // doesn't briefly display content from a different note.
+  useEffect(() => {
+    setStreamPreview(null);
+  }, [activeTab]);
+
   // Save generated note to session_notes DB and update local state, then regenerate title
   useEffect(() => {
     onNoteGenerated(async (noteId, content) => {
@@ -1130,7 +1136,7 @@ export default function SessionView() {
           </div>
         ) : (
           <SessionEditor
-            key={noteIsStreaming ? `note-streaming` : `${activeSession.id}-${activeTab}`}
+            key={noteIsStreaming ? `note-streaming-${activeNoteId}` : `${activeSession.id}-${activeTab}`}
             initialState={initialState}
             onChange={isReadOnly ? undefined : handleEditorChange}
             readOnly={isReadOnly}
