@@ -47,6 +47,8 @@ export function useDictation(
   // The onChunk callback uses sendBinary directly (same binary frame format
   // as live transcription). The sidecar routes binary frames to dictation
   // when a dictation session is active.
+  // Note: user-configured audio gain (Settings → Audio) is applied automatically
+  // via useAudioCapture's GainNode — no additional wiring needed here.
   const {
     start: startCapture,
     stop: stopCapture,
