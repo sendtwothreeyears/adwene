@@ -91,6 +91,23 @@ class _StreamingSession:
 # Active streaming sessions, keyed by session_id.
 _sessions: dict[str, _StreamingSession] = {}
 
+
+# -- Dictation session state --
+
+# Max dictation audio: ~5 minutes at 16 kHz 16-bit mono ≈ 9.6 MB.
+_MAX_DICTATION_BYTES = 5 * 60 * 16_000 * 2
+
+
+@dataclass
+class _DictationSession:
+    """Per-session state for short-burst dictation."""
+
+    audio: bytearray = field(default_factory=bytearray)
+
+
+# Active dictation sessions, keyed by session_id.
+_dictation_sessions: dict[str, _DictationSession] = {}
+
 # Cooperative cancellation flags for background re-transcription tasks.
 # When a new recording starts for the same session_id, the flag is set
 # so the in-flight retranscription aborts between encoder chunks.
@@ -357,6 +374,7 @@ async def handler(websocket):
     logger.info("Client connected: %s", remote)
     _clients.add(websocket)
     session_id = None
+    dictation_session_id = None
 
     # Tell the new client the current engine status immediately.
     if _engines_ready.is_set():
@@ -376,8 +394,24 @@ async def handler(websocket):
 
     try:
         async for message in websocket:
-            # --- Binary frame: feed to VAD + accumulate for batch ---
+            # --- Binary frame: feed to VAD/accumulate or dictation ---
             if isinstance(message, bytes):
+                # Dictation takes priority — they're mutually exclusive with
+                # live transcription, but check dictation first.
+                if dictation_session_id and dictation_session_id in _dictation_sessions:
+                    dsess = _dictation_sessions[dictation_session_id]
+                    if len(dsess.audio) + len(message) > _MAX_DICTATION_BYTES:
+                        # Max duration exceeded — auto-stop with error
+                        _dictation_sessions.pop(dictation_session_id, None)
+                        await _send_json(websocket, {
+                            "type": protocol.DICTATE_ERROR,
+                            "session_id": dictation_session_id,
+                            "error": "Dictation exceeded maximum duration (~5 minutes)",
+                        })
+                        dictation_session_id = None
+                    else:
+                        dsess.audio.extend(message)
+                    continue
                 if session_id and session_id in _sessions:
                     sess = _sessions[session_id]
                     # Accumulate for final batch reconciliation (capped)
@@ -749,6 +783,85 @@ async def handler(websocket):
                         "error": str(exc),
                     })
 
+            elif msg_type == protocol.DICTATE_START:
+                dsid = data.get("session_id")
+                if not dsid:
+                    await _send_json(websocket, {
+                        "type": protocol.ERROR,
+                        "message": "dictate_start requires session_id",
+                    })
+                    continue
+                # Clean up any existing dictation for this connection
+                if dictation_session_id and dictation_session_id in _dictation_sessions:
+                    _dictation_sessions.pop(dictation_session_id, None)
+                dictation_session_id = dsid
+                _dictation_sessions[dsid] = _DictationSession()
+                logger.info("Dictation started for session %s", dsid)
+
+            elif msg_type == protocol.DICTATE_STOP:
+                dsid = data.get("session_id", dictation_session_id)
+                dsess = _dictation_sessions.pop(dsid, None)
+                dictation_session_id = None
+
+                if dsess is None or len(dsess.audio) == 0:
+                    logger.info("Dictation stop with no audio for session %s", dsid)
+                    await _send_json(websocket, {
+                        "type": protocol.DICTATE_RESULT,
+                        "session_id": dsid,
+                        "text": "",
+                    })
+                    continue
+
+                logger.info(
+                    "Dictation stop for session %s — %d bytes (%.1fs)",
+                    dsid, len(dsess.audio),
+                    len(dsess.audio) / (16_000 * 2),
+                )
+
+                # Wait for engines if still loading
+                if not _engines_ready.is_set():
+                    await _engines_ready.wait()
+
+                try:
+                    audio_bytes = bytes(dsess.audio)
+                    dsess.audio.clear()
+
+                    # Minimum ~140ms of audio needed for meaningful transcription
+                    min_samples = 2_240
+                    if len(audio_bytes) < min_samples * 2:
+                        await _send_json(websocket, {
+                            "type": protocol.DICTATE_RESULT,
+                            "session_id": dsid,
+                            "text": "",
+                        })
+                        continue
+
+                    t0 = time.perf_counter()
+
+                    # Use the high-level engine.transcribe() — simpler than the
+                    # low-level chunked encoder and works with any ASR backend.
+                    text = await _asr_engine.transcribe(audio_bytes)
+
+                    logger.info(
+                        "Dictation transcribe for %s: %.1fs, audio=%.1fs",
+                        dsid, time.perf_counter() - t0,
+                        len(audio_bytes) / (16_000 * 2),
+                    )
+
+                    await _send_json(websocket, {
+                        "type": protocol.DICTATE_RESULT,
+                        "session_id": dsid,
+                        "text": text,
+                    })
+
+                except Exception:
+                    logger.exception("Dictation transcribe failed for session %s", dsid)
+                    await _send_json(websocket, {
+                        "type": protocol.DICTATE_ERROR,
+                        "session_id": dsid,
+                        "error": "Transcription failed",
+                    })
+
             else:
                 await websocket.send(message)
 
@@ -756,6 +869,9 @@ async def handler(websocket):
         pass
     finally:
         _clients.discard(websocket)
+        # Clean up any orphaned dictation session
+        if dictation_session_id and dictation_session_id in _dictation_sessions:
+            _dictation_sessions.pop(dictation_session_id, None)
         # Clean up any orphaned session
         if session_id and session_id in _sessions:
             sess = _sessions.pop(session_id)

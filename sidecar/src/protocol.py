@@ -7,6 +7,8 @@ Client -> Sidecar (text):
     {"type": "generate_title", "session_id": "<uuid>", "transcript": "..."}
     {"type": "extract_text", "request_id": "<uuid>", "file_path": "..."}
     {"type": "generate_pdf", "request_id": "<uuid>", "html": "...", "provider": {...}, "session_title": "..."}
+    {"type": "dictate_start", "session_id": "<uuid>"}
+    {"type": "dictate_stop",  "session_id": "<uuid>"}
 
 Client -> Sidecar (binary):
     Raw PCM Int16 audio frames (16 kHz, mono, 100 ms = 3 200 bytes)
@@ -24,6 +26,8 @@ Sidecar -> Client (text):
     {"type": "text_extracted",   "request_id": "<uuid>", "text": "...", "error": null}
     {"type": "pdf_ready",      "request_id": "<uuid>", "data": "<base64>"}
     {"type": "pdf_error",      "request_id": "<uuid>", "error": "..."}
+    {"type": "dictate_result",  "session_id": "<uuid>", "text": "..."}
+    {"type": "dictate_error",   "session_id": "<uuid>", "error": "..."}
     {"type": "error",          "message": "..."}
 """
 
@@ -34,6 +38,10 @@ GENERATE_NOTE = "generate_note"
 GENERATE_TITLE = "generate_title"
 EXTRACT_TEXT = "extract_text"
 GENERATE_PDF = "generate_pdf"
+
+# -- Inbound: dictation --
+DICTATE_START = "dictate_start"
+DICTATE_STOP = "dictate_stop"
 
 # -- Outbound message types --
 TRANSCRIPT = "transcript"
@@ -49,6 +57,8 @@ TITLE = "title"
 TEXT_EXTRACTED = "text_extracted"
 PDF_READY = "pdf_ready"
 PDF_ERROR = "pdf_error"
+DICTATE_RESULT = "dictate_result"
+DICTATE_ERROR = "dictate_error"
 STATUS = "status"
 ERROR = "error"
 

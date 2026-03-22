@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { Template } from "../../types";
 import TemplateSelectorModal from "../templates/TemplateSelectorModal";
+import DictationButton from "./dictation/DictationButton";
 
 interface NoteToolbarProps {
   hasNote: boolean;
@@ -14,6 +15,11 @@ interface NoteToolbarProps {
   templates: Template[];
   selectedTemplateId: string | null;
   onTemplateChange: (id: string) => void;
+  /** Dictation state — when provided, DictationButton is shown. */
+  isDictating?: boolean;
+  isDictationProcessing?: boolean;
+  onDictationStart?: () => void;
+  onDictationStop?: () => void;
 }
 
 export default function NoteToolbar({
@@ -28,6 +34,10 @@ export default function NoteToolbar({
   templates,
   selectedTemplateId,
   onTemplateChange,
+  isDictating = false,
+  isDictationProcessing = false,
+  onDictationStart,
+  onDictationStop,
 }: NoteToolbarProps) {
   const [isCopied, setIsCopied] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -74,6 +84,15 @@ export default function NoteToolbar({
         )}
       </div>
       <div className="flex items-center gap-2">
+        {onDictationStart && onDictationStop && (
+          <DictationButton
+            isDictating={isDictating}
+            isProcessing={isDictationProcessing}
+            disabled={isGenerating}
+            onStart={onDictationStart}
+            onStop={onDictationStop}
+          />
+        )}
         <button
           type="button"
           onClick={handleCopy}
