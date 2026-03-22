@@ -6,7 +6,6 @@ import type { SerializedEditorState } from "lexical";
 import SessionTopBar from "./SessionTopBar";
 import SessionTabBar, { type SessionTab, getNoteId } from "./SessionTabBar";
 import SessionEditor from "./SessionEditor";
-import TranscriptPanel from "./TranscriptPanel";
 import NoteToolbar from "./NoteToolbar";
 import { useAudioCapture } from "../../hooks/useAudioCapture";
 import { useAudioDevices } from "../../hooks/useAudioDevices";
@@ -143,10 +142,7 @@ export default function SessionView() {
   );
 
   const {
-    liveTranscript,
-    finalTranscript,
     isTranscribing,
-    isRefining,
     refinedTranscript,
     error: transcriptionError,
     startTranscription,
@@ -711,8 +707,16 @@ export default function SessionView() {
         saveTimer.current = setTimeout(async () => {
           pendingSaveRef.current = null;
           try {
-            await db.updateSession(activeSession.id, { [field]: state });
-            mergeActiveSession(activeSession.id, { [field]: state });
+            // When transcript is edited, also update rawTranscript so note
+            // regeneration picks up the edits.
+            if (field === "transcript") {
+              const plainText = extractTextFromLexical(state);
+              await db.updateSession(activeSession.id, { [field]: state, rawTranscript: plainText });
+              mergeActiveSession(activeSession.id, { [field]: state, rawTranscript: plainText });
+            } else {
+              await db.updateSession(activeSession.id, { [field]: state });
+              mergeActiveSession(activeSession.id, { [field]: state });
+            }
           } catch (err) {
             console.error(`Failed to save ${field}:`, err);
           }
@@ -1124,16 +1128,6 @@ export default function SessionView() {
           <div className="flex items-center justify-center py-16 text-sm text-gray-400">
             Loading note...
           </div>
-        ) : activeTab === "transcription" && (isLiveTranscribing || finalTranscript || (liveTranscript && !activeSession.rawTranscript)) ? (
-          <TranscriptPanel
-            rawTranscript={activeSession.rawTranscript}
-            liveTranscript={liveTranscript}
-            finalTranscript={finalTranscript}
-            isTranscribing={isTranscribing}
-            isRecording={captureState === "recording"}
-            isRefining={isRefining}
-            liveTranscriptionEnabled={getLiveTranscriptionEnabled()}
-          />
         ) : (
           <SessionEditor
             key={noteIsStreaming ? `note-streaming` : `${activeSession.id}-${activeTab}`}
