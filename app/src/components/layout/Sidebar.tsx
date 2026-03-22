@@ -106,7 +106,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`flex h-full shrink-0 flex-col border-r border-sidebar-border bg-sidebar-bg font-fakt transition-all duration-200 ease-out ${
+      className={`flex h-full shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar-bg font-fakt transition-all duration-200 ease-out ${
         sidebarCollapsed ? "w-[60px]" : "w-[220px]"
       }`}
     >
@@ -134,7 +134,7 @@ export default function Sidebar() {
         <button
           onClick={handleCreateSession}
           title="New Session"
-          className={`flex w-full items-center justify-center rounded-md bg-primary text-sm font-medium text-white hover:bg-primary-dark transition-colors ${
+          className={`flex w-full items-center justify-center whitespace-nowrap rounded-md bg-primary text-sm font-medium text-white hover:bg-primary-dark transition-colors ${
             sidebarCollapsed ? "px-2 py-2" : "gap-2 px-3 py-2"
           }`}
         >
@@ -149,7 +149,7 @@ export default function Sidebar() {
         <button
           onClick={handleScribeClick}
           title="Scribe"
-          className={`flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors ${
+          className={`flex w-full items-center whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors ${
             sidebarCollapsed ? "justify-center" : "justify-between"
           } ${
             isScribeActive
@@ -183,7 +183,7 @@ export default function Sidebar() {
               key={item.view}
               onClick={() => setView(item.view)}
               title={item.label}
-              className={`flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors ${
+              className={`flex w-full items-center whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors ${
                 sidebarCollapsed ? "justify-center" : "gap-3"
               } ${
                 isActive
@@ -204,7 +204,7 @@ export default function Sidebar() {
         <button
           onClick={() => setView("settings")}
           title="Settings"
-          className={`flex w-full items-center rounded-md px-3 py-2 text-sm transition-colors ${
+          className={`flex w-full items-center whitespace-nowrap rounded-md px-3 py-2 text-sm transition-colors ${
             sidebarCollapsed ? "justify-center" : "gap-3"
           } ${
             currentView === "settings"
@@ -240,7 +240,7 @@ export default function Sidebar() {
             }`}
           />
         ) : (
-          <div className="flex items-center gap-2 text-xs text-sidebar-text-muted">
+          <div className="flex items-center gap-2 whitespace-nowrap text-xs text-sidebar-text-muted">
             <span
               className={`h-2 w-2 rounded-full ${
                 connectionState === "connected"
