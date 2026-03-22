@@ -879,8 +879,12 @@ export default function SessionView() {
     resetDictation();
   }, [resetDictation]);
 
-  // Dictation is available on the transcription tab when the editor is editable
-  const canDictate = activeTab === "transcription" && hasCompletedTranscript && !isLiveTranscribing && sidecarConnected;
+  // Dictation is available when the editor is editable and sidecar is connected
+  const canDictate = sidecarConnected && !isReadOnly && !isLiveTranscribing && (
+    (activeTab === "transcription" && hasCompletedTranscript) ||
+    (getNoteId(activeTab) !== null && !isStreaming) ||
+    activeTab === "context"
+  );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     if (activeTab !== "context") return;
@@ -1204,6 +1208,10 @@ export default function SessionView() {
                       isGenerating={isGenerating}
                       isExporting={isExporting}
                       canGenerate={!!activeSession.rawTranscript}
+                      isDictating={isDictating}
+                      isDictationProcessing={isDictationProcessing}
+                      onDictationStart={canDictate ? () => startDictation(activeSession.id) : undefined}
+                      onDictationStop={canDictate ? stopDictation : undefined}
                       templates={templates}
                       selectedTemplateId={selectedTemplateId}
                       onTemplateChange={(templateId) => {
@@ -1294,6 +1302,18 @@ export default function SessionView() {
                         </svg>
                         {transcriptCopied ? "Copied" : "Copy"}
                       </button>
+                    </div>
+                  )
+                : activeTab === "context" && canDictate
+                  ? (
+                    <div className="absolute top-3 right-4 z-10">
+                      <DictationButton
+                        isDictating={isDictating}
+                        isProcessing={isDictationProcessing}
+                        disabled={!canDictate}
+                        onStart={() => activeSession && startDictation(activeSession.id)}
+                        onStop={stopDictation}
+                      />
                     </div>
                   )
                 : undefined
