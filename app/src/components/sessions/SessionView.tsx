@@ -1239,7 +1239,7 @@ export default function SessionView() {
                   )
                 : activeTab === "transcription"
                   ? (
-                    <div className="flex justify-end px-4 pt-3">
+                    <div className="absolute top-3 right-4 z-10">
                       <button
                         type="button"
                         disabled={!activeSession.rawTranscript || transcriptCopied}
