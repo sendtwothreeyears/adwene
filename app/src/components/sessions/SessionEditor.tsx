@@ -139,7 +139,7 @@ export default memo(function SessionEditor({
   return (
     <LexicalComposer initialConfig={initialConfig}>
       <div
-        className="flex h-full flex-col rounded-md border border-border bg-white"
+        className="relative flex h-full flex-col rounded-md border border-border bg-white"
       >
         {header}
         <div className="relative min-h-0 flex-1 flex flex-col">
