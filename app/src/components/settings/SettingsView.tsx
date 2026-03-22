@@ -1,7 +1,7 @@
 import { useState } from "react";
 import SettingsTabBar, { type SettingsTab } from "./SettingsTabBar";
 import NoteSettingsPane from "./NoteSettingsPane";
-import TranscriptionSettingsPane from "./TranscriptionSettingsPane";
+
 import AccountSettingsPane from "./AccountSettingsPane";
 
 export default function SettingsView() {
@@ -15,7 +15,6 @@ export default function SettingsView() {
       <SettingsTabBar activeTab={activeTab} onTabChange={setActiveTab} />
       <div className="mt-6 flex-1 overflow-y-auto scrollbar-hide">
         {activeTab === "note" && <NoteSettingsPane />}
-        {activeTab === "transcription" && <TranscriptionSettingsPane />}
         {activeTab === "account" && <AccountSettingsPane />}
       </div>
     </div>
